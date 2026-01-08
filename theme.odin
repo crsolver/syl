@@ -82,6 +82,11 @@ apply_style :: proc(style: ^Style, element: Element) {
 	base := get_base(element)
 	base.theme = style
 
+	if base.base_style == nil { 
+		for child in get_children(element) do apply_style(style, child)
+		return
+	}
+
 	if !(Style_Property.Sizing in base.overrides) {
 		base.base_style.sizing = style.box.default.sizing
 	}

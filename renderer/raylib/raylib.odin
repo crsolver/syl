@@ -38,22 +38,24 @@ text_draw :: proc(text: ^syl.Text) {
     if len(text.lines) == 0 {
         return
     }
-    
+
     font_size: i32 = 18
     line_height: f32 = f32(font_size)
     
     // Get text color from style or use default
-    color := rl.BLACK
+    color := rl.DARKGRAY
     // If you have style system: 
     // if text.base_style != nil && .Color in text.overrides {
     //     color = text.base_style.color
     // }
     
+    rl.DrawRectangle(i32(text.global_position.x), i32(text.global_position.y), i32(text.size.x), i32(text.size.y), rl.LIGHTGRAY)
     // Draw each line
     for line, i in text.lines {
         // Draw the line content
         line_cstr := strings.clone_to_cstring(line.content)
         defer delete(line_cstr)
+
         
         rl.DrawText(
             line_cstr,

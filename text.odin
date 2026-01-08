@@ -2,6 +2,8 @@ package syl
 
 import rl "vendor:raylib"
 import "core:strings"
+import "core:fmt"
+import "core:math"
 
 /* in other file:
 Base_Element :: struct {
@@ -45,39 +47,53 @@ text :: proc(
     if r, ok := ref.?; ok {
         r^ = text
     }
-
+	st := new(Base_Style) // TODO: temp
+	text.base.base_style = st
+	text.base_style.sizing = .Expand
+	text.wrap = .Word
 	text.content = content
-	line := Text_Line{
-		content = content,
-		width = rl.MeasureText(strings.clone_to_cstring(content), 18)
-	}
-
-	append_elem(&text.lines, line)
-
+	text.id = "text"
 	return text
 }
 
-text_fit_sizing_width :: proc(text: ^Text) -> [2]f32 {
-	width: f32
+text_fit_sizing:: proc(text: ^Text) -> (f32, f32) {
+	cstr := strings.clone_to_cstring(text.content)
+	defer delete(cstr)
+	width:f32 = f32(rl.MeasureText(cstr, 18))
+
+	clear(&text.lines)
+
 	if text.wrap == .None {
-		return len(text.lines) > 0 ? text.lines[0].size : {0,0}
+		append(&text.lines, Text_Line{
+			size = {width, 18},
+			width = i32(width),
+			content = text.content,
+		})
+		text.size = {width, 18}
+		text.min_size = {width, 18}
+		width = width
+		return width, width
 	}
-   
+
 	// Find the width of the largest word in the content
 	max_word_width: f32 = 0
 	
 	words := strings.split(text.content, " ")
 	defer delete(words)
-	
+
 	for word in words {
-		word_width := f32(rl.MeasureText(strings.clone_to_cstring(word), 18))
+		cstr := strings.clone_to_cstring(word)
+		word_width := f32(rl.MeasureText(cstr, 18))
+		delete(cstr)
 		max_word_width = max(max_word_width, word_width)
 	}
 	
 	font_size: f32 = 18
 	if len(text.content) == 0 do font_size = 0
 	
-	return {max_word_width, font_size}
+	text.size = {width, font_size}
+	text.min_size = {max_word_width, font_size}
+	return width, max_word_width
 }
 
 text_wrap :: proc(el: Element) {
@@ -85,6 +101,9 @@ text_wrap :: proc(el: Element) {
 		if text.wrap != .Word {
 			return
 		}
+
+		fmt.println("text width:", text.size.x)
+		fmt.println("text min_width:", text.min_size.x)
 		
 		// Clear existing lines
 		clear(&text.lines)
@@ -110,7 +129,10 @@ text_wrap :: proc(el: Element) {
 		defer strings.builder_destroy(&current_line)
 		
 		current_width: f32 = 0
-		space_width := f32(rl.MeasureText(" ", font_size))
+		// Measure space using a C-string (consistent with other MeasureText calls)
+		space_cstr := strings.clone_to_cstring(" ")
+		defer delete(space_cstr)
+		space_width := f32(rl.MeasureText(space_cstr, font_size))
 		
 		for word, i in words {
 			word_cstr := strings.clone_to_cstring(word)
@@ -132,7 +154,7 @@ text_wrap :: proc(el: Element) {
 				line_content := strings.clone(strings.to_string(current_line))
 				line := Text_Line{
 					content = line_content,
-					width = i32(current_width),
+					width = i32(math.ceil(current_width)),
 					size = {current_width, f32(font_size)},
 				}
 				append(&text.lines, line)
@@ -156,7 +178,7 @@ text_wrap :: proc(el: Element) {
 			line_content := strings.clone(strings.to_string(current_line))
 			line := Text_Line{
 				content = line_content,
-				width = i32(current_width),
+				width = i32(math.ceil(current_width)),
 				size = {current_width, f32(font_size)},
 			}
 			append(&text.lines, line)
@@ -167,10 +189,14 @@ text_wrap :: proc(el: Element) {
 	}
 }
 
+text_fit_sizing_height :: proc(text: ^Text) -> (f32,f32) {
+	return text.size.y, text.min_size.y
+}
+
 text_update_positions :: proc(text: ^Text) {
 	cursor := text.global_position
 	for &line in text.lines {
 		line.global_position = cursor
-        cursor += line.size.y + text.line_space
+        cursor.y += line.size.y + text.line_space
     }
 }

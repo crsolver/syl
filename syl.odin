@@ -25,18 +25,20 @@ Base_Element :: struct {
 	position: [2]f32,
 	global_position: [2]f32,
 	size: [2]f32,
+	min_size: [2]f32,
 	overrides: bit_set[Style_Property],
 	theme: ^Style,
 }
 
 get_min_size :: proc(element: Element) -> [2]f32 {
 	base := get_base(element)
-	return {base.base_style.min_width, base.base_style.min_height}
+	return base.min_size
 }
 
 get_base :: proc(element: Element) -> ^Base_Element { 
 	#partial switch e in element {
 	case ^Box: return &e.base
+	case ^Text: return &e.base
 	}
 	return nil
 }

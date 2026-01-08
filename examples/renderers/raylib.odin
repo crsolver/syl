@@ -72,23 +72,26 @@ main :: proc() {
 			),
 		}
 	)*/
-
+	t: ^syl.Text
 	app := syl.box(
-		size = {250, 200},
-		layout_direction = .Left_To_Right,
+		size = {400, 400},
+		layout_direction = .Top_To_Bottom,
 		sizing = .Fixed,
+		id = "parent",
 		background_color = BLANK,
 		children = {
-			syl.box(sizing = .Expand),
+			syl.box(),
 			syl.box(
-				syl.text("This is an example of a text element inside a box. It should wrap properly and adjust the box size accordingly."),
-				sizing = .Expand
-			)
+				syl.text("This is an example of a text element inside a box. It should wrap properly and adjust the box size accordingly.", ref = &t),
+			),
 		}
 	)
 
 	syl.apply_style(&style, app)
 	syl.calculate_layout(app)
+
+	fmt.printfln("Text min size: %v", syl.get_min_size(t))
+	fmt.printfln("Text size: %v", t.size)
     for !rl.WindowShouldClose() {
 		syl.update(app)
 		syl.update_transitions()
