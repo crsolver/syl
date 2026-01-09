@@ -49,7 +49,7 @@ text :: proc(
     }
 	st := new(Base_Style) // TODO: temp
 	text.base.base_style = st
-	text.base_style.sizing = .Expand
+	text.sizing = {.Expand, .Expand}
 	text.wrap = .Word
 	text.content = content
 	text.id = "text"

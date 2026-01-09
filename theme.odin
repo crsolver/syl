@@ -5,19 +5,17 @@ import "core:math/ease"
 
 Style_Property :: enum {
 	Gap,
-	Layout_Direction,
-	Min_Width,
-	Min_Height,
 	Padding_All,
 	Padding_Top,
 	Padding_Right,
 	Padding_Bottom,
 	Padding_Left,
 	Background_Color,
-	Sizing,
+	Width,
+	Height,
 }
 
-Style :: struct {
+StyleSheet :: struct {
 	box: Box_Style_Class,
 	box_classes: map[string]Box_Style_Class
 }
@@ -28,9 +26,8 @@ Base_Style :: struct {
 	padding_right: f32,
 	padding_bottom: f32,
 	padding_left: f32,
-	min_width: f32,
-	min_height: f32,
-	sizing: Sizing,
+	width: f32,
+	height: f32,
 }
 
 Base_Style_Delta :: struct {
@@ -39,8 +36,6 @@ Base_Style_Delta :: struct {
 	padding_right: Maybe(f32),
 	padding_bottom: Maybe(f32),
 	padding_left: Maybe(f32),
-	min_width: Maybe(f32),
-	min_height: Maybe(f32),
 }
 
 Transition_Setup:: struct {
@@ -61,7 +56,6 @@ Box_Style_Setup :: struct {
 
 Box_Style :: struct {
 	using base: Base_Style,
-	layout_direction: Layout_Direction,
 	transitions: map[Animatable_Property]Transition_Setup,
 	gap: f32,
 }
@@ -78,17 +72,13 @@ Box_Style_Class :: struct {
 	hover: Box_Style_Delta,
 }
 
-apply_style :: proc(style: ^Style, element: Element) {
+apply_style :: proc(style: ^StyleSheet, element: Element) {
 	base := get_base(element)
-	base.theme = style
+	base.style_sheet = style
 
 	if base.base_style == nil { 
 		for child in get_children(element) do apply_style(style, child)
 		return
-	}
-
-	if !(Style_Property.Sizing in base.overrides) {
-		base.base_style.sizing = style.box.default.sizing
 	}
 
 	if !(Style_Property.Background_Color in base.overrides) {

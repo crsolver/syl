@@ -18,6 +18,7 @@ Box :: struct {
 	using base: Base_Element,
 	style: Box_Style,
     state: Box_State,
+    layout_direction: Layout_Direction,
 }
 
 calculate_layout :: proc(element: Element) {
@@ -48,7 +49,8 @@ fit_sizing:: proc(element: Element, axis: int) -> (f32, f32) {
 box_fit_sizing :: proc(box: ^Box, axis: int) -> (f32, f32) {
     size: f32
     min_size: f32
-    primary_axis := box.style.layout_direction == .Left_To_Right ? 0 : 1
+    primary_axis := box.layout_direction == .Left_To_Right ? 0 : 1
+    cross_axis := 1 - primary_axis
 
     // Calculate size based on layout direction
     if axis == primary_axis {
@@ -74,11 +76,6 @@ box_fit_sizing :: proc(box: ^Box, axis: int) -> (f32, f32) {
         }
     }
     
-    if box.style.sizing == .Fixed {
-        box.min_size = box.size
-        return box.size.x, box.size.x
-    }
-
     if axis == 0 { // horizontal axis
         size += box.style.padding_left + box.style.padding_right
         min_size += box.style.padding_left + box.style.padding_right
@@ -86,13 +83,16 @@ box_fit_sizing :: proc(box: ^Box, axis: int) -> (f32, f32) {
         size += box.style.padding_top + box.style.padding_bottom
         min_size += box.style.padding_top + box.style.padding_bottom
     }
-    
-    box.size[axis] = size
-    box.min_size[axis] = min_size
+
+    if box.sizing[axis] == .Fixed {
+        box.min_size[axis] = box.size[axis]
+    } else {
+        box.size[axis] = size
+        box.min_size[axis] = min_size
+    }
     
     return box.size[axis], box.min_size[axis]
 }
-
 
 // Step 2: Expand children that want to grow
 expand_shrink_sizing :: proc(element: Element, axis: int) {
@@ -106,7 +106,7 @@ box_expand_shrink_sizing :: proc(box: ^Box, axis: int) {
     if len(box.children) == 0 do return
     
     // Determine primary and cross axis based on layout direction
-    primary_axis := box.style.layout_direction == .Left_To_Right ? 0 : 1
+    primary_axis := box.layout_direction == .Left_To_Right ? 0 : 1
     cross_axis := 1 - primary_axis
     
     // Take the whole size for cross axis expansion
@@ -120,16 +120,18 @@ box_expand_shrink_sizing :: proc(box: ^Box, axis: int) {
 
         for child in box.children {
             base := get_base(child)
-            sizing := base.base_style.sizing
 
-            should_expand_cross := sizing == .Expand || 
-                (cross_axis == 0 && sizing == .Expand_Horizontal) ||
-                (cross_axis == 1 && sizing == .Expand_Vertical)
-
-            if should_expand_cross {
+            if base.sizing[cross_axis] == .Expand {
+                if base.id == "child" {
+                    fmt.println("target", target)
+                    fmt.println("grow child", base.size)
+                }
                 // Clamp child cross-axis size to the available target, but
                 // never go below the child's minimum size.
-                base.size[axis] = max(base.min_size[axis], target)
+                base.size[cross_axis] = max(base.min_size[cross_axis], target)
+                if base.id == "child" {
+                    fmt.println("grow child", base.size)
+                }
             }
         }
 
@@ -137,7 +139,7 @@ box_expand_shrink_sizing :: proc(box: ^Box, axis: int) {
         return
     }
 
-    remaining := box.size[axis]
+    remaining := box.size[primary_axis]
     if primary_axis == 0 {
         remaining -= box.style.padding_left + box.style.padding_right
     } else {
@@ -152,147 +154,114 @@ box_expand_shrink_sizing :: proc(box: ^Box, axis: int) {
     // Account for space taken by children before deciding to grow or shrink
     for child in box.children {
         base := get_base(child)
-        remaining -= base.size[axis]
+        remaining -= base.size[primary_axis]
     }
 
     if remaining > 0 { // Expand 
-        growable := [dynamic]^Base_Element{}
-        defer delete(growable)
-
-        for child in box.children {
-            base := get_base(child)
-            sizing := base.base_style.sizing
-            should_expand_primary := 
-                sizing == .Expand || 
-                (primary_axis == 0 && sizing == .Expand_Horizontal) ||
-                (primary_axis == 1 && sizing == .Expand_Vertical)
-
-            if should_expand_primary {
-                append_elem(&growable, base)
-            }
-        }
-
-        count := len(growable)
-        for count > 0 && remaining > 0 {
-            smallest := growable[0].size[axis]
-            second_smallest := math.INF_F32
-            to_add := remaining
-
-            // Find the size of the smallest and the second smallest element
-            for child in growable {
-                if child.size[axis] < smallest {
-                    second_smallest = smallest
-                    smallest = child.size[axis]
-                }
-                if child.size[axis] > smallest {
-                    second_smallest = min(second_smallest, child.size[axis])
-                    to_add = second_smallest - smallest
-                }
-            }
-
-            to_add = min(to_add, remaining / f32(len(growable)))
-
-            // Make the smallest elements as big as the second smallest element
-            for child in growable {
-                if child.size[axis] == smallest {
-                    child.size[axis] += to_add
-                    remaining -= to_add
-                }
-            }
-        }
+        expand_children(box, axis) 
     } else if remaining < 0 { // Shrink
         // First attempt: if there are children that can expand, distribute
         // the available space among them so they share the container before
         // running the generic shrink algorithm.
-        growable := [dynamic]^Base_Element{}
-        non_grow_sum := f32(0)
-        for child in box.children {
-            base := get_base(child)
-            sizing := base.base_style.sizing
-            should_grow := sizing == .Expand ||
-                (primary_axis == 0 && sizing == .Expand_Horizontal) ||
-                (primary_axis == 1 && sizing == .Expand_Vertical)
-            if should_grow {
-                append_elem(&growable, base)
-            } else {
-                non_grow_sum += base.size[axis]
-            }
-        }
-
-        if len(growable) > 0 {
-            // Compute available space for children (box size minus paddings and gaps)
-            available := box.size[axis]
-            if primary_axis == 0 {
-                available -= box.style.padding_left + box.style.padding_right
-            } else {
-                available -= box.style.padding_top + box.style.padding_bottom
-            }
-            if len(box.children) > 0 {
-                available -= f32(len(box.children) - 1) * box.style.gap
-            }
-
-            // Space to distribute among growable children
-            space_for_growable := available - non_grow_sum
-            if space_for_growable < 0 {
-                space_for_growable = 0
-            }
-
-            target := space_for_growable / f32(len(growable))
-            for child in growable {
-                child.size[axis] = max(child.min_size[axis], target)
-            }
-
-            // Recompute remaining after distribution
-            remaining = available
-            for child in box.children do remaining -= get_base(child).size[axis]
-        }
+        remaining := expand_children(box, primary_axis) 
+        for child in box.children do remaining -= get_base(child).size[primary_axis]
 
         shrinkable := [dynamic]^Base_Element{}
         for child in box.children do append_elem(&shrinkable, get_base(child))
         defer delete(shrinkable)
 
-        if box.id == "parent" {
-            fmt.printfln("Shrinking box with remaining: %v", remaining)
-        }
-
         for remaining < 0 {
-            largest := shrinkable[0].size[axis]
+            largest := shrinkable[0].size[primary_axis]
             second_largest := f32(0)
             to_add := remaining
 
             // Find the size of the largest and the second largest element
             for child in shrinkable {
-                if child.size[axis] > largest {
+                if child.size[primary_axis] > largest {
                     second_largest = largest
-                    largest = child.size[axis]
+                    largest = child.size[primary_axis]
                 }
-                if child.size[axis] < largest {
-                    second_largest = max(second_largest, child.size[axis])
+                if child.size[primary_axis] < largest {
+                    second_largest = max(second_largest, child.size[primary_axis])
                     to_add = second_largest - largest
                 }
             }
+
+            if len(shrinkable) == 0 do break
 
             to_add = max(to_add, remaining / f32(len(shrinkable)))
 
             // Make the largest elements as small as the second largest element
             for c, i in box.children {
                 child := get_base(c)
-                if child.id == "text" {
-                    fmt.printfln("Shrinking text from %v", child.size[axis])
-                }
-                prev := child.size[axis]
-                if child.size[axis] == largest {
-                    child.size[axis] += to_add
-                    if child.size[axis] <= child.min_size[axis] { // ?
-                        ordered_remove(&shrinkable, i)
+                
+                prev := child.size[primary_axis]
+                if child.size[primary_axis] == largest {
+                    child.size[primary_axis] += to_add
+                    if child.size[primary_axis] <= child.min_size[primary_axis] { // ?
+                        //ordered_remove(&shrinkable, i) // Fix
+                        remove_item(&shrinkable, child)
                     }
-                    remaining -= (child.size[axis] - prev)
+                    remaining -= (child.size[primary_axis] - prev)
                 }
             }
         }
     }
 
-    for child in box.children do expand_shrink_sizing(child, axis)
+    for child in box.children do expand_shrink_sizing(child, primary_axis)
+}
+
+expand_children :: proc(box: ^Box, primary_axis: int) -> f32 {
+    growable := [dynamic]^Base_Element{}
+    non_grow_sum := f32(0)
+    for child in box.children {
+        base := get_base(child)
+        if base.sizing[primary_axis] == .Expand {
+            append_elem(&growable, base)
+        } else {
+            non_grow_sum += base.size[primary_axis]
+        }
+    }
+
+    available := box.size[primary_axis]
+
+    if len(growable) > 0 {
+        // Compute available space for children (box size minus paddings and gaps)
+        if primary_axis == 0 {
+            available -= box.style.padding_left + box.style.padding_right
+        } else {
+            available -= box.style.padding_top + box.style.padding_bottom
+        }
+        if len(box.children) > 0 {
+            available -= f32(len(box.children) - 1) * box.style.gap
+        }
+
+        // Space to distribute among growable children
+        space_for_growable := available - non_grow_sum
+        if space_for_growable < 0 {
+            space_for_growable = 0
+        }
+
+        target := space_for_growable / f32(len(growable))
+        for child in growable {
+            child.size[primary_axis] = max(child.min_size[primary_axis], target)
+        }
+
+        // Recompute remaining after distribution
+        //remaining = available
+        //for child in box.children do remaining -= get_base(child).size[primary_axis]
+    }
+
+    return available
+}
+
+remove_item :: proc(array: ^[dynamic]$T, item: T) {
+    for it, i in array {
+        if it == item {
+            ordered_remove(array, i)
+            return
+        }
+    }
 }
 
 // Step 3: Position all children
@@ -311,7 +280,7 @@ update_box_layout :: proc(box: ^Box) {
     gap := box.style.gap
     
     // Determine primary and cross axis based on layout direction
-    primary_axis := box.style.layout_direction == .Left_To_Right ? 0 : 1
+    primary_axis := box.layout_direction == .Left_To_Right ? 0 : 1
     
     cursor := [2]f32{padding_left, padding_top}
 
@@ -342,7 +311,8 @@ box_change_state :: proc(box: ^Box) {
 box :: proc(
 	children:       ..Element, 
     ref:              Maybe(^^Box) = nil,
-	layout_direction: Maybe(Layout_Direction) = nil,
+    style_sheet:      ^StyleSheet= nil,
+	layout_direction: Layout_Direction = .Top_To_Bottom, 
 	gap:              Maybe(f32) = nil,
 	padding:          Maybe(f32) = nil,
 	padding_top:      Maybe(f32) = nil,
@@ -350,39 +320,68 @@ box :: proc(
 	padding_bottom:   Maybe(f32) = nil,
 	padding_left:     Maybe(f32) = nil,
 	background_color: Maybe([4]u8) = nil,
-	size:             [2]f32 = {0,0},
+	size:             [2]f32 = {0,0}, // use for Fixed sizing, only apply if it's different than {0,0}
 	width:            Maybe(f32) = nil,
 	height:           Maybe(f32) = nil,
-	sizing: 		  Maybe(Sizing) = nil,
-    id: Maybe(string) = nil,
+	sizing: 		  Sizing = {.Fit, .Fit},
+    width_sizing:    Maybe(SizingKind) = nil,
+    height_sizing:    Maybe(SizingKind) = nil,
+    id:               string = "",
 ) -> Element {
 	box := new(Box)
-	box.base.base_style = &box.style.base
-	box.size = size
+    fmt.println("before", id, size)
+    box.style_sheet = style_sheet
+
+    if style_sheet != nil {
+	    box.base.base_style = &box.style.base
+    }
+    
+    box.id = id
+	box.sizing = sizing
+    box.layout_direction = layout_direction
+
     if r, ok := ref.?; ok {
         r^ = box
     }
 
-    if i, ok := id.?; ok {
-        box.id = i
+    // overrides
+    if size.x != 0 {
+        box.size.x = size.x
+        box.overrides += {.Width}
+        box.sizing.x = .Fixed
     }
 
-	// style overrides
-	if val, ok := layout_direction.?; ok {
-		box.style.layout_direction = val
-		box.overrides += { .Layout_Direction }
-	}
+    if size.y != 0 {
+        box.size.y = size.y
+        box.overrides += {.Height}
+        box.sizing.y = .Fixed
+    }
+
+	if val, ok := width.?; ok {
+        box.size.x = val
+        box.overrides += {.Width}
+        box.sizing.x = .Fixed
+    }
+
+    if val, ok := height.?; ok {
+        box.size.y = val
+        box.overrides += {.Height}
+        box.sizing.y = .Fixed
+    }
+    
+    if val, ok := width_sizing.?; ok {
+        box.sizing.x = val
+    }
+
+    if val, ok := height_sizing.?; ok {
+        box.sizing.y = val
+    }
 
 	if val, ok := gap.?; ok {
-		box.style.gap = val
 		box.overrides += { .Gap }
+        box.style.gap = val
 	}
 
-	if val, ok := sizing.?; ok {
-		box.style.sizing = val
-		box.overrides += { .Sizing }
-	}
-	
 	if val, ok := padding.?; ok {
 		box.style.padding_top    = val
 		box.style.padding_right  = val
@@ -418,6 +417,14 @@ box :: proc(
 
 	for child in children do set_parent(child, box)
 	append_elems(&box.children, ..children)
+    if style_sheet != nil {
+        apply_style(style_sheet, box)
+    }
+
+    if box.id == "parent" {
+        fmt.printfln("direction", box.layout_direction)
+    }
+
 	return box
 }
 
@@ -436,3 +443,5 @@ update_box :: proc(box: ^Box) {
 
     for child in box.children do update(child)
 }
+
+Expand :: Sizing{.Expand,.Expand}

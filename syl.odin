@@ -8,13 +8,13 @@ Element:: union {
 	^Text,
 }
 
-Sizing :: enum {
+SizingKind :: enum {
 	Fit,
 	Fixed,
 	Expand,
-	Expand_Horizontal,
-	Expand_Vertical,
 }
+
+Sizing :: [2]SizingKind
 
 Base_Element :: struct {
 	id: string,
@@ -26,8 +26,9 @@ Base_Element :: struct {
 	global_position: [2]f32,
 	size: [2]f32,
 	min_size: [2]f32,
+	sizing: Sizing,
 	overrides: bit_set[Style_Property],
-	theme: ^Style,
+	style_sheet: ^StyleSheet,
 }
 
 get_min_size :: proc(element: Element) -> [2]f32 {
