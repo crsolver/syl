@@ -6,6 +6,7 @@ Syl is an initiative to build a viable and competitive alternative for creating 
 
 With a retained-mode approach, Syl maintains a persistent representation of the interface, enabling efficient updates, clear separation between state and rendering, and simpler reasoning about complex layouts. This model makes it easier to optimize redraws, manage interactions, and scale interfaces as they grow in size and complexity.
 
+[!demo](./demo.gif)
 
 > ⚠️WARNING! Syl is an experimental library. The final architecture is still undefined and may change significantly as the project evolves, so it is not suitable for real-world projects.
 > 
