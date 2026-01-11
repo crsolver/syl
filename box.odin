@@ -93,6 +93,10 @@ box_fit:: proc(box: ^Box, axis: int) -> (f32, f32) {
     return box.size[axis], box.min_size[axis]
 }
 
+calculate_available_space :: proc(box: ^Box, axis: int) -> f32 {
+    return box.size[axis] - calculate_padding(box, axis)
+}
+
 calculate_padding :: proc(box: ^Box, axis: int) -> f32 {
     if axis == 0 { 
         return box.style.padding_left + box.style.padding_right
@@ -117,7 +121,6 @@ remove_item :: proc(array: ^[dynamic]$T, item: T) {
     }
 }
 
-// Step 3: Position all children
 update_positions :: proc(element: ^Element) {
     #partial switch element.type {
     case .Box:
@@ -218,15 +221,7 @@ handle_primary_axis_sizing :: proc(box: ^Box, primary_axis: int) {
     }
 }
 
-calculate_available_space :: proc(box: ^Box, axis: int) -> f32 {
-    space := box.size[axis]
-    if axis == 0 {
-        space -= box.style.padding_left + box.style.padding_right
-    } else {
-        space -= box.style.padding_top + box.style.padding_bottom
-    }
-    return space
-}
+
 
 calculate_gaps :: proc(box: ^Box) -> f32 {
     if len(box.children) == 0 do return 0
