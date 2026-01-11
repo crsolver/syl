@@ -51,22 +51,22 @@ item :: proc(title, active: string) -> ^syl.Element {
 make_app :: proc() -> ^syl.Element {
 	// You can pass a reference to a pointer to get a reference of an Element...
 	title: ^syl.Text 
-	return syl.box(size = {SCREEN_W, SCREEN_H}, padding=10, style_sheet = &style_sheet, children = {
-		syl.box(sizing=syl.Expand, padding=20, children = {
-			syl.box(sizing=syl.Expand, gap=0, padding=0, children = {
-				syl.box(width_sizing=.Expand, padding=14, layout_direction=.Left_To_Right, children= {
-					syl.box(sizing=syl.Expand, border_color=BLANK),
-					syl.text("REMOTE SENTRY WEAPON SYSTEM", wrap=false),
-					syl.box(sizing=syl.Expand, border_color=BLANK),
+	return syl.box(size = {SCREEN_W, SCREEN_H}, padding = 10, style_sheet = &style_sheet, children = {
+		syl.box(sizing=syl.Expand, padding = 20, children = {
+			syl.box(sizing = syl.Expand, gap = 0, padding = 0, children = {
+				syl.box(width_sizing =.Expand, padding = 14, layout_direction = .Left_To_Right, children = {
+					syl.box(sizing = syl.Expand, border_color = BLANK),
+					syl.text("REMOTE SENTRY WEAPON SYSTEM", wrap = false),
+					syl.box(sizing = syl.Expand, border_color = BLANK),
 				}),
-				syl.box(width_sizing=.Expand, padding=0, layout_direction=.Left_To_Right, children = {
+				syl.box(width_sizing = .Expand, padding = 0, layout_direction = .Left_To_Right, children = {
 					item("System mode", "AUTO-REMOTE"),	
 					item("Weapon status", "SAFE"),	
 					item("Neural link", "STANDBY"),	
 					item("Hull integrity", "91.3%"),	
 				}),
-				syl.box(sizing=syl.Expand, padding=20, children = {
-					syl.text("Hull schematic floats center-screen, a wireframe skeleton breathing with the ship’s pulse. Damaged sections flicker amber; armor integrity ticks down in precise decimals. A thin red vector shows incoming fire, recalculated every millisecond. Orders stack as translucent cards. The top one glows. Authorize spinal discharge. The system asks nothing. It already knows. Across the glass, warnings whisper instead of shout. No alarms—just color shifts, micro-vibrations in the text. The ship doesn’t panic. It calculates.")
+				syl.box(sizing = syl.Expand, padding = 20, children = {
+					syl.text("Hull schematic floats center-screen, a wireframe...")
 				}),
 			})
 		})
