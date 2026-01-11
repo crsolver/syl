@@ -4,55 +4,51 @@ import rl "vendor:raylib"
 import syl "../.."
 import "core:strings"
 
-draw :: proc(element: syl.Element) {
-	#partial switch e in element {
-	case ^syl.Box: box_draw(e)
-	case ^syl.Text: text_draw(e)
+draw :: proc(element: ^syl.Element) {
+	#partial switch element.type {
+	case .Box: box_draw(cast(^syl.Box)element)
+	case .Text: text_draw(cast(^syl.Text)element)
 	}
 
-	for e in syl.get_children(element) do draw(e)
+	for e in element.children do draw(e)
 }
 
 box_draw :: proc(box: ^syl.Box) {
 	pos := box.global_position
 	size := box.size
+	border_width: f32 = 2
+	
+	// Draw background at original size
 	if box.style.background_color.a > 0 {
-		rl.DrawRectangle(i32(pos.x), i32(pos.y), i32(size.x), i32(size.y), cast(rl.Color)box.style.background_color)
-		//rl.DrawRectangleRounded({pos.x, pos.y, size.x, size.y},0.2, 10, cast(rl.Color)box.style.background_color)
+		bg_roundness := get_roundness(size, box.style.border_radius)
+		rl.DrawRectangleRounded({pos.x, pos.y, size.x, size.y}, bg_roundness, 20, cast(rl.Color)box.style.background_color)
 	}
-	rl.DrawRectangleLines(i32(pos.x), i32(pos.y), i32(size.x), i32(size.y), rl.GRAY)
-	//rl.DrawRectangleRoundedLines({pos.x, pos.y, size.x, size.y},0.2, 10, rl.GRAY)
+	
+	// Draw border expanded outward
+	if box.style.border_color.a > 0 && border_width > 0 {
+		border_pos := pos - {border_width, border_width}
+		border_size := size + {border_width * 2, border_width * 2}
+		border_roundness: f32 = 0
+        if box.style.border_radius > 0 do get_roundness(border_size, box.style.border_radius + border_width)
+		rl.DrawRectangleRoundedLinesEx({pos.x, pos.y, size.x, size.y}, border_roundness, 20, border_width, cast(rl.Color)box.style.border_color)
+	}
 }
 
-stack_draw :: proc(stack: ^syl.Stack) {
-	pos := stack.global_position
-	size := stack.size
-	rl.DrawRectangleLines(i32(pos.x), i32(pos.y), i32(size.x), i32(size.y), rl.BLACK)
-	if stack.style.background_color.a > 0 {
-		rl.DrawRectangle(i32(pos.x), i32(pos.y), i32(size.x), i32(size.y), cast(rl.Color)stack.style.background_color)
-	}
-	for child in stack.children do draw(child)
+get_roundness :: proc(rect_size: rl.Vector2, radius_pixels: f32) -> f32 {
+    min_dimension := min(rect_size.x, rect_size.y)
+    roundness := (2 * radius_pixels / min_dimension)
+    return clamp(roundness, 0.0, 1.0)
 }
 
 text_draw :: proc(text: ^syl.Text) {
-    if len(text.lines) == 0 {
-        return
-    }
+    if len(text.lines) == 0 do return
 
-    font_size: i32 = 18
+    font_size: i32 = text.style.font_size
     line_height: f32 = f32(font_size)
+
+    //rl.DrawRectangleLines(i32(text.global_position.x), i32(text.global_position.y), i32(text.size.x), i32(text.size.y), rl.GRAY)
     
-    // Get text color from style or use default
-    color := rl.WHITE
-    // If you have style system: 
-    // if text.base_style != nil && .Color in text.overrides {
-    //     color = text.base_style.color
-    // }
-    
-    //rl.DrawRectangle(i32(text.global_position.x), i32(text.global_position.y), i32(text.size.x), i32(text.size.y), rl.LIGHTGRAY)
-    // Draw each line
     for line, i in text.lines {
-        // Draw the line content
         line_cstr := strings.clone_to_cstring(line.content)
         defer delete(line_cstr)
         
@@ -61,7 +57,7 @@ text_draw :: proc(text: ^syl.Text) {
             i32(line.global_position.x),
             i32(line.global_position.y),
             font_size,
-            color,
+            cast(rl.Color)text.style.color,
         )
     }
 }

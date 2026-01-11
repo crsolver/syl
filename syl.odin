@@ -1,11 +1,20 @@
 package syl
 
-import "vendor:raylib"
+Element_Type :: enum { Box, Text }
 
-Element:: union {
-	^Box,
-	^Stack,
-	^Text,
+Element :: struct {
+	type: Element_Type,
+	id: string,
+	parent: ^Element,
+	base_style: ^Element_Base_Style,
+	children: [dynamic]^Element,
+	position: [2]f32,
+	global_position: [2]f32,
+	size: [2]f32,
+	min_size: [2]f32,
+	sizing: Sizing,
+	overrides: bit_set[Style_Property],
+	style_sheet: ^StyleSheet,
 }
 
 SizingKind :: enum {
@@ -16,100 +25,34 @@ SizingKind :: enum {
 
 Sizing :: [2]SizingKind
 
-Base_Element :: struct {
-	id: string,
-	base_parent: ^Base_Element,
-	parent: Element,
-	base_style: ^Base_Style,
-	children: [dynamic]Element,
-	position: [2]f32,
-	global_position: [2]f32,
-	size: [2]f32,
-	min_size: [2]f32,
-	sizing: Sizing,
-	overrides: bit_set[Style_Property],
-	style_sheet: ^StyleSheet,
-}
+element_set_position :: proc(element: ^Element, pos: [2]f32) { 
+	element.position = pos
+	element.global_position = pos
 
-get_min_size :: proc(element: Element) -> [2]f32 {
-	base := get_base(element)
-	return base.min_size
-}
-
-get_base :: proc(element: Element) -> ^Base_Element { 
-	#partial switch e in element {
-	case ^Box: return &e.base
-	case ^Text: return &e.base
+	if element.parent != nil {
+		element.global_position += element.parent.global_position
 	}
-	return nil
-}
-
-get_parent :: proc(element: Element) -> Element { 
-	return get_base(element).parent
-}
-
-get_children :: proc(element: Element) -> []Element { 
-	return get_base(element).children[:]
-}
-
-set_parent :: proc(element: Element, parent: Element)  { 
-	base := get_base(element)
-	base_parent := get_base(parent)
-	base.parent = parent
-	base.base_parent = base_parent
-}
-
-get_size :: proc(element: Element) -> [2]f32 { 
-	return get_base(element).size
-}
-
-set_size :: proc(element: Element, size: [2]f32) { 
-	get_base(element).size = size
-}
-
-get_position :: proc(element: Element) -> [2]f32 { 
-	return get_base(element).position
-}
-
-get_global_position :: proc(element: Element) -> [2]f32 { 
-	base := get_base(element)
-	return base.global_position
-}
-
-set_position :: proc(element: Element, pos: [2]f32) { 
-	base := get_base(element)
-
-	base.position = pos
-	base.global_position = pos
-
-	if base.base_parent != nil {
-		base.global_position += base.base_parent.global_position
-	}
-	for child in base.children {
-		child_base := get_base(child)
-		child_base.global_position = child_base.position + base.global_position
+	for child in element.children {
+		child.global_position = child.position + element.global_position
 	}
 }
 
-set_global_position :: proc(element: Element, pos: [2]f32) { 
-	base := get_base(element)
+element_set_global_position :: proc(element: ^Element, pos: [2]f32) { 
+	element.position = pos
+	element.global_position = pos
 
-	base.position = pos
-	base.global_position = pos
-
-	if base.base_parent != nil {
-		base.position -= base.base_parent.global_position
+	if element.parent != nil {
+		element.position -= element.parent.global_position
 	}
 
-	for child in base.children {
-		child_base := get_base(child)
-		child_base.global_position = child_base.position + base.global_position
+	for child in element.children {
+		child.global_position = child.position + element.global_position
 	}
 }
 
-update :: proc(el: Element) {
-	#partial switch v in el {
-	case ^Box: update_box(v)
+element_update :: proc(el: ^Element) {
+	#partial switch el.type {
+	case .Box: update_box(cast(^Box)el)
 	}
 }
 

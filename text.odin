@@ -2,22 +2,7 @@ package syl
 
 import rl "vendor:raylib"
 import "core:strings"
-import "core:fmt"
-import "core:math"
 
-/* in other file:
-Base_Element :: struct {
-	id: string,
-	base_parent: ^Base_Element,
-	parent: Element,
-	base_style: ^Base_Style,
-	children: [dynamic]Element,
-	position: [2]f32,
-	global_position: [2]f32,
-	size: [2]f32,
-	overrides: bit_set[Style_Property],
-	theme: ^Style,
-}*/
 Text_Wrap :: enum {
     None,
     Word,
@@ -32,45 +17,54 @@ Text_Line :: struct {
 }
 
 Text :: struct {
-    using base: Base_Element,
+    using base: Element,
+	style: Text_Style,
     content: string,
 	wrap: Text_Wrap,
 	line_space: f32,
-	lines: [dynamic]Text_Line
+	lines: [dynamic]Text_Line,
 }
 
 text :: proc(
 	content: string = "",
     ref:              Maybe(^^Text) = nil,
-) -> Element {
+	font_size: i32 = 18,
+	color: Maybe([4]u8) = nil,
+	wrap: bool = true,
+) -> ^Element {
 	text := new(Text)
     if r, ok := ref.?; ok {
         r^ = text
     }
-	st := new(Base_Style) // TODO: temp
-	text.base.base_style = st
+	text.type = .Text
 	text.sizing = {.Expand, .Expand}
-	text.wrap = .Word
+	if wrap {
+		text.wrap = .Word
+	}
+	text.style.font_size = font_size
 	text.content = content
-	text.id = "text"
+	if val, ok := color.?; ok {
+		text.style.color = val
+		text.overrides += {.Text_Color}
+	}
 	return text
 }
 
-text_fit_sizing:: proc(text: ^Text) -> (f32, f32) {
+text_fit:: proc(text: ^Text) -> (f32, f32) {
 	cstr := strings.clone_to_cstring(text.content)
 	defer delete(cstr)
-	width:f32 = f32(rl.MeasureText(cstr, 18))
+	width:f32 = f32(rl.MeasureText(cstr, text.style.font_size))
 
 	clear(&text.lines)
 
 	if text.wrap == .None {
 		append(&text.lines, Text_Line{
-			size = {width, 18},
+			size = {width, f32(text.style.font_size)},
 			width = i32(width),
 			content = text.content,
 		})
-		text.size = {width, 18}
-		text.min_size = {width, 18}
+		text.size = {width, f32(text.style.font_size)}
+		text.min_size = {width, f32(text.style.font_size)}
 		width = width
 		return width, width
 	}
@@ -83,40 +77,34 @@ text_fit_sizing:: proc(text: ^Text) -> (f32, f32) {
 
 	for word in words {
 		cstr := strings.clone_to_cstring(word)
-		word_width := f32(rl.MeasureText(cstr, 18))
+		word_width := f32(rl.MeasureText(cstr, i32(text.style.font_size)))
 		delete(cstr)
 		max_word_width = max(max_word_width, word_width)
 	}
-	
-	font_size: f32 = 18
+	font_size := text.style.font_size	
 	if len(text.content) == 0 do font_size = 0
 	
-	text.size = {width, font_size}
-	text.min_size = {max_word_width, font_size}
+	text.size = {width, f32(font_size)}
+	text.min_size = {max_word_width, f32(text.style.font_size)}
 	return width, max_word_width
 }
 
-text_wrap :: proc(el: Element) {
-	if text, ok := el.(^Text); ok {
+text_wrap :: proc(e: ^Element) {
+	// TODO: Fix text overflow
+	if e.type == .Text {
+		text := cast(^Text)e
 		if text.wrap != .Word {
 			return
 		}
-
-		fmt.println("text width:", text.size.x)
-		fmt.println("text min_width:", text.min_size.x)
 		
-		// Clear existing lines
 		clear(&text.lines)
 		
 		if len(text.content) == 0 {
 			return
 		}
 		
-		font_size: i32 = 18
-		line_height: f32 = f32(font_size)
 		max_width := text.size.x
 		
-		// Split content into words
 		words := strings.split(text.content, " ")
 		defer delete(words)
 		
@@ -124,47 +112,28 @@ text_wrap :: proc(el: Element) {
 			return
 		}
 		
-		// Build lines word by word
+		space_width := measure_text(" ", text.style.font_size)
+		
 		current_line := strings.builder_make()
 		defer strings.builder_destroy(&current_line)
-		
 		current_width: f32 = 0
-		// Measure space using a C-string (consistent with other MeasureText calls)
-		space_cstr := strings.clone_to_cstring(" ")
-		defer delete(space_cstr)
-		space_width := f32(rl.MeasureText(space_cstr, font_size))
 		
-		for word, i in words {
-			word_cstr := strings.clone_to_cstring(word)
-			defer delete(word_cstr)
+		for word in words {
+			word_width := measure_text(word, text.style.font_size)
 			
-			word_width := f32(rl.MeasureText(word_cstr, font_size))
-			
-			// Check if adding this word would overflow
-			test_width := current_width
+			// Check if word fits on current line
+			test_width := word_width
 			if strings.builder_len(current_line) > 0 {
-				test_width += space_width + word_width
-			} else {
-				test_width = word_width
+				test_width = current_width + (space_width*2) + word_width // Temporal Fix: two spaces
 			}
 			
-			// If word doesn't fit and we have content, start new line
+			// Start new line if needed
 			if test_width > max_width && strings.builder_len(current_line) > 0 {
-				// Finalize current line
-				line_content := strings.clone(strings.to_string(current_line))
-				line := Text_Line{
-					content = line_content,
-					width = i32(math.ceil(current_width)),
-					size = {current_width, f32(font_size)},
-				}
-				append(&text.lines, line)
-				
-				// Start new line with current word
+				add_line(&text.lines, strings.to_string(current_line), current_width, text.style.font_size)
 				strings.builder_reset(&current_line)
 				strings.write_string(&current_line, word)
 				current_width = word_width
 			} else {
-				// Add word to current line
 				if strings.builder_len(current_line) > 0 {
 					strings.write_string(&current_line, " ")
 				}
@@ -173,23 +142,34 @@ text_wrap :: proc(el: Element) {
 			}
 		}
 		
-		// Add final line if there's content
+		// Add final line
 		if strings.builder_len(current_line) > 0 {
-			line_content := strings.clone(strings.to_string(current_line))
-			line := Text_Line{
-				content = line_content,
-				width = i32(math.ceil(current_width)),
-				size = {current_width, f32(font_size)},
-			}
-			append(&text.lines, line)
+			add_line(&text.lines, strings.to_string(current_line), current_width, text.style.font_size)
 		}
-		text.size.y = f32(len(text.lines)) * line_height
+		
+		// Update text dimensions
+		text.size.y = f32(len(text.lines)) * f32(text.style.font_size)
+		text.size.x = max_width  // Keep container width, don't expand
 	} else {
-		for child in get_base(el).children do text_wrap(child)
+		for child in e.children do text_wrap(child)
 	}
 }
 
-text_fit_sizing_height :: proc(text: ^Text) -> (f32,f32) {
+measure_text :: proc(s: string, font_size: i32) -> f32 {
+	cstr := strings.clone_to_cstring(s)
+	defer delete(cstr)
+	return f32(rl.MeasureText(cstr, font_size))
+}
+
+add_line :: proc(lines: ^[dynamic]Text_Line, content: string, width: f32, font_size: i32) {
+	append(lines, Text_Line{
+		content = strings.clone(content),
+		size = {width, f32(font_size)},
+		width = i32(width),
+	})
+}
+
+text_fit_height :: proc(text: ^Text) -> (f32,f32) {
 	return text.size.y, text.min_size.y
 }
 
