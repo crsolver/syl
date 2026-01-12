@@ -1,37 +1,38 @@
 package syl
 
 import "core:math/ease"
+import "core:fmt"
 
-StyleSheet :: struct {
-	box: Box_Style_Class,
+Style_Sheet :: struct {
+	box: Box_State_Style,
 	text: Text_Style,
 }
 
-Style_Property :: enum {
-	Gap,
-	Padding_All,
-	Padding_Top,
-	Padding_Right,
-	Padding_Bottom,
-	Padding_Left,
-	Background_Color,
-	Border_Color,
-	Border_Radius,
-	Width,
-	Height,
-	Text_Color,
+Box_State_Style :: struct {
+	default: Box_Style,
+	hover: Box_Style_Delta,
 }
 
-Element_Base_Style :: struct {
+Box_Style:: struct {
 	background_color: [4]u8,
 	border_color: [4]u8,
 	border_radius: f32,
-	padding_top: f32,
-	padding_right: f32,
-	padding_bottom: f32,
-	padding_left: f32,
-	width: f32,
-	height: f32,
+	padding: [4]f32,
+	transitions: Box_Transition_Setups,
+	gap: f32,
+}
+
+Box_Style_Delta :: struct {
+	background_color: Maybe([4]u8),
+	border_color: Maybe([4]u8),
+	border_radius: Maybe(f32),
+	padding: Maybe([4]f32),
+	padding_top: Maybe(f32),
+	padding_right: Maybe(f32),
+	padding_bottom: Maybe(f32),
+	padding_left: Maybe(f32),
+	transitions: Maybe(Box_Transition_Setups),
+	gap: Maybe(f32),
 }
 
 Transition_Setup:: struct {
@@ -39,42 +40,9 @@ Transition_Setup:: struct {
 	ease: ease.Ease,
 }
 
-Transition_Setups :: struct {
+Box_Transition_Setups :: struct {
 	background_color: Transition_Setup,
-}
-
-Box_Style_Class :: struct {
-	default: Box_Style_Setup,
-	hover: Box_Style_Delta,
-}
-
-Box_Style_Setup :: struct {
-	using base: Element_Base_Style,
-	layout_direction: Layout_Direction,
-	transitions: Transition_Setups,
-	gap: f32,
-}
-
-Box_Style :: struct {
-	using base: Element_Base_Style,
-	transitions: map[Animatable_Property]Transition_Setup,
-	gap: f32,
-}
-
-// Used to override Default Element_Base_Style
-Element_Base_Style_Delta :: struct {
-	background_color: Maybe([4]u8),
-	padding_top: Maybe(f32),
-	padding_right: Maybe(f32),
-	padding_bottom: Maybe(f32),
-	padding_left: Maybe(f32),
-}
-
-Box_Style_Delta :: struct {
-	using element: Element_Base_Style_Delta,
-	layout_direction: Maybe(Layout_Direction),
-	transitions: Maybe(Transition_Setups),
-	gap: Maybe(f32),
+	padding: Transition_Setup,
 }
 
 Text_Style :: struct {
@@ -83,63 +51,117 @@ Text_Style :: struct {
 } 
 
 // Set the values of non-overridden properties of Element and its children from the given StyleSheet
-element_apply_style :: proc(element: ^Element, style: ^StyleSheet) {
+element_apply_style :: proc(element: ^Element, style: ^Style_Sheet) {
 	element.style_sheet = style
 
 	#partial switch element.type {
 	case .Box:
-		box := cast(^Box)element
-		if !(.Gap in element.overrides) {
-			box.style.gap = style.box.default.gap
-		}
-		/*
-		if style.box.transitions.background_color.duration > 0 {
-			e.style.transitions[.Background_Color] = style.box.transitions.background_color
-		}*/
+		box_apply_style(cast(^Box)element, style.box.default)
 	case .Text:
 		text := cast(^Text)element
-		if !(.Text_Color in text.overrides) {
+		if !(.Color in text.overrides) {
 			text.style.color = style.text.color
 		}
 		return
 	}
+}
 
-	if element.base_style == nil { 
-		return
+element_apply_style_recursive :: proc(element: ^Element, style: ^Style_Sheet) {
+	element_apply_style(element, style)
+	for child in element.children do element_apply_style_recursive(child, style)
+}
+
+box_apply_style_default :: proc(box: ^Box, style: Box_Style) {
+	if !(.Gap in box.overrides) {
+		box.gap = style.gap
 	}
 
-	if !(.Background_Color in element.overrides) {
-		element.base_style.background_color = style.box.default.background_color
-	}
-
-	if !(.Border_Color in element.overrides) {
-		element.base_style.border_color = style.box.default.border_color
-	}
-
-	if !(.Border_Radius in element.overrides) {
-		element.base_style.border_radius = style.box.default.border_radius
-	}
-
-	if !(.Padding_All in element.overrides) {
-		if !(.Padding_Top in element.overrides) {
-			element.base_style.padding_top = style.box.default.padding_top
+	if !(.Background_Color in box.overrides) {
+		t := style.transitions.background_color
+		if t.duration > 0 {
+			animate_color(&box.background_color, style.background_color, t.duration, t.ease)
+		} else {
+			box.background_color = style.background_color
 		}
+		box.background_color = style.background_color
+	}
 
-		if !(.Padding_Right in element.overrides) {
-			element.base_style.padding_right = style.box.default.padding_right
-		}
+	if !(.Border_Color in box.overrides) {
+		box.border_color = style.border_color
+	}
 
-		if !(.Padding_Bottom in element.overrides) {
-			element.base_style.padding_bottom = style.box.default.padding_bottom
-		}
+	if !(.Border_Radius in box.overrides) {
+		box.border_radius = style.border_radius
+	}
 
-		if !(.Padding_Left in element.overrides) {
-			element.base_style.padding_left = style.box.default.padding_left 
+	if !(.Padding in box.overrides) {
+		t := style.transitions.padding
+		if t.duration > 0 {
+			animate_float(&box.padding[0], style.padding[0], t.duration, t.ease)
+			animate_float(&box.padding[1], style.padding[1], t.duration, t.ease)
+			animate_float(&box.padding[2], style.padding[2], t.duration, t.ease)
+			animate_float(&box.padding[3], style.padding[3], t.duration, t.ease)
+		} else {
+			box.padding = style.padding
 		}
 	}
 }
 
-element_apply_style_recursive :: proc(element: ^Element, style: ^StyleSheet) {
-	element_apply_style(element, style)
-	for child in element.children do element_apply_style_recursive(child, style)
+box_apply_style_delta:: proc(box: ^Box, delta: Box_Style_Delta) {
+	transitions := box.style_sheet.box.default.transitions
+	delta_transitions := transitions
+
+	if val, ok := delta.transitions.?; ok {
+		delta_transitions = val
+	}
+
+	if val, ok := delta.gap.?; ok && !(.Gap in box.overrides) {
+		box.gap = val 
+	}
+
+	if val, ok := delta.background_color.?; ok && !(.Background_Color in box.overrides) {
+		t := transitions.background_color
+		delta_t := delta_transitions.background_color
+
+		if delta_t.duration > 0 {
+			animate_color(&box.background_color, val, delta_t.duration, delta_t.ease)
+		} else if t.duration > 0 {
+			animate_color(&box.background_color, val, t.duration, t.ease)
+		} else {
+			box.background_color = val
+		}
+	}
+
+	if val, ok := delta.border_color.?; ok && !(.Border_Color in box.overrides) {
+		box.border_color = val
+	}
+
+	if val, ok := delta.border_radius.?; ok && !(.Border_Radius in box.overrides) {
+		t := transitions.background_color
+		delta_t := delta_transitions.background_color
+	}
+
+	if val, ok := delta.padding.?; ok && !(.Padding in box.overrides) {
+		t := transitions.padding
+		delta_t := delta_transitions.padding
+
+		if delta_t.duration > 0 {
+			animate_float(&box.padding[0], val[0], delta_t.duration, delta_t.ease)
+			animate_float(&box.padding[1], val[1], delta_t.duration, delta_t.ease)
+			animate_float(&box.padding[2], val[2], delta_t.duration, delta_t.ease)
+			animate_float(&box.padding[3], val[3], delta_t.duration, delta_t.ease)
+		} else if t.duration > 0 {
+			animate_float(&box.padding[0], val[0], t.duration, t.ease)
+			animate_float(&box.padding[1], val[1], t.duration, t.ease)
+			animate_float(&box.padding[2], val[2], t.duration, t.ease)
+			animate_float(&box.padding[3], val[3], t.duration, t.ease)
+		} else {
+			box.padding = val
+		}
+	}
+}
+
+box_apply_style :: proc {
+	box_apply_style_default,
+	box_apply_style_delta,
 }

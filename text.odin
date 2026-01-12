@@ -2,6 +2,7 @@ package syl
 
 import rl "vendor:raylib"
 import "core:strings"
+import "core:fmt"
 
 Text_Wrap :: enum {
     None,
@@ -16,6 +17,10 @@ Text_Line :: struct {
     min_width: i32,
 }
 
+Text_Property :: enum {
+	Color
+}
+
 Text :: struct {
     using base: Element,
 	style: Text_Style,
@@ -23,6 +28,7 @@ Text :: struct {
 	wrap: Text_Wrap,
 	line_space: f32,
 	lines: [dynamic]Text_Line,
+	overrides: bit_set[Text_Property]
 }
 
 text :: proc(
@@ -45,7 +51,7 @@ text :: proc(
 	text.content = content
 	if val, ok := color.?; ok {
 		text.style.color = val
-		text.overrides += {.Text_Color}
+		text.overrides += {.Color}
 	}
 	return text
 }
@@ -174,7 +180,7 @@ text_fit_height :: proc(text: ^Text) -> (f32,f32) {
 }
 
 text_update_positions :: proc(text: ^Text) {
-	cursor := text.global_position
+	cursor := text.base.global_position
 	for &line in text.lines {
 		line.global_position = cursor
         cursor.y += line.size.y + text.line_space

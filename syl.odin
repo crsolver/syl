@@ -4,17 +4,14 @@ Element_Type :: enum { Box, Text }
 
 Element :: struct {
 	type: Element_Type,
-	id: string,
 	parent: ^Element,
-	base_style: ^Element_Base_Style,
 	children: [dynamic]^Element,
 	position: [2]f32,
 	global_position: [2]f32,
 	size: [2]f32,
 	min_size: [2]f32,
 	sizing: Sizing,
-	overrides: bit_set[Style_Property],
-	style_sheet: ^StyleSheet,
+	style_sheet: ^Style_Sheet,
 }
 
 SizingKind :: enum {
@@ -24,6 +21,14 @@ SizingKind :: enum {
 }
 
 Sizing :: [2]SizingKind
+
+
+element_add_child:: proc(element: ^Element, children: ..^Element) { 
+	for child in children {
+		append_elem(&element.children, child)
+		child.parent = element
+	}
+}
 
 element_set_position :: proc(element: ^Element, pos: [2]f32) { 
 	element.position = pos

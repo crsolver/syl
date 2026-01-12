@@ -2,6 +2,7 @@ package syl
 
 import "core:time"
 import "core:math/ease"
+import "core:fmt"
 
 Transition :: struct {
     duration: f32,
@@ -67,7 +68,7 @@ update_transitions :: proc() {
     }
 }
 
-animate_float:: proc(target: ^f32, end_val: f32, duration: f32) {
+animate_float:: proc(target: ^f32, end_val: f32, duration: f32, easing: ease.Ease) {
     // Clear existing transition for this pointer if it exists
     for t, i in transition_manager.transitions {
         if t.target == target {
@@ -76,17 +77,19 @@ animate_float:: proc(target: ^f32, end_val: f32, duration: f32) {
         }
     }
 
+    if target^ == end_val do return
+
     append(&transition_manager.transitions, Float_Transition{
         target   = target,
         start    = target^,
         end      = end_val,
         start_t  = time.tick_now(),
         duration = duration,
-        easing   = .Linear,
+        easing   = easing,
     })
 }
 
-animate_color :: proc(target: ^[4]u8, end_val: [4]u8, duration: f32) {
+animate_color :: proc(target: ^[4]u8, end_val: [4]u8, duration: f32, easing: ease.Ease) {
     // Clear existing transition for this pointer if it exists
     for t, i in transition_manager.color_transitions {
         if t.target == target {
@@ -94,6 +97,7 @@ animate_color :: proc(target: ^[4]u8, end_val: [4]u8, duration: f32) {
             break
         }
     }
+    if target^ == end_val do return
 
     append(&transition_manager.color_transitions, Color_Transition{
         target   = target,
@@ -101,14 +105,13 @@ animate_color :: proc(target: ^[4]u8, end_val: [4]u8, duration: f32) {
         end      = end_val,
         start_t  = time.tick_now(),
         duration = duration,
-        easing   = .Quadratic_In_Out,
+        easing   = easing,
     })
 }
 
 interpolate_float :: proc(start, end: f32, progress: f32) -> f32 {
     return start + (end - start) * progress
 }
-
 
 interpolate_color :: proc(start: [4]u8, end: [4]u8, progress: f32) -> [4]u8 {
     return {

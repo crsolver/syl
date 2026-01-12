@@ -6,12 +6,26 @@ package syl
 import rl "vendor:raylib"
 import "core:math"
 
+Box_Property :: enum {
+	Gap,
+	Padding,
+	Background_Color,
+	Border_Color,
+	Border_Radius,
+}
 
 Box :: struct {
 	using element: Element,
-	style: Box_Style,
+    background_color: [4]u8,
+	border_color: [4]u8,
+	border_radius: f32,
+	padding: [4]f32, // top, right, bottom, left
+	transitions: map[Animatable_Property]Transition_Setup,
+	gap: f32,padding_left: f32,
     state: Box_State,
     layout_direction: Layout_Direction,
+    on_state_changed: proc(e: ^Element, to: Box_State),
+	overrides: bit_set[Box_Property],
 }
 
 Layout_Direction :: enum {
@@ -99,9 +113,9 @@ calculate_available_space :: proc(box: ^Box, axis: int) -> f32 {
 
 calculate_padding :: proc(box: ^Box, axis: int) -> f32 {
     if axis == 0 { 
-        return box.style.padding_left + box.style.padding_right
+        return box.padding[3] + box.padding[1]
     } else { 
-        return box.style.padding_top + box.style.padding_bottom
+        return box.padding[0] + box.padding[3]
     }
 }
 
@@ -131,9 +145,9 @@ update_positions :: proc(element: ^Element) {
 }
 
 box_update_positions:: proc(box: ^Box) {
-    padding_top := box.style.padding_top
-    padding_left := box.style.padding_left
-    gap := box.style.gap
+    padding_top := box.padding[0]
+    padding_left := box.padding[3]
+    gap := box.gap
     
     // Determine primary and cross axis based on layout direction
     primary_axis := box.layout_direction == .Left_To_Right ? 0 : 1
@@ -152,34 +166,37 @@ box_update_positions:: proc(box: ^Box) {
     }
 }
 
-GREEN :: [4]u8{195,214,44, 255}
-DARK_GREEN :: [4]u8{255, 255, 34, 255}
-
 box_change_state :: proc(box: ^Box) {
-    // TODO: remove temporal hard-coded example animations
     switch box.state {
     case .Default:
+        if box.on_state_changed != nil {
+            box.on_state_changed(box, .Hover)
+        }
+        if box.style_sheet != nil {
+            box_apply_style(box, box.style_sheet.box.hover)
+        }
         box.state = .Hover
-        animate_color(&box.style.background_color, DARK_GREEN, 0.3)
-        animate_float(&box.style.padding_bottom, 34, 0.2)
+
     case .Hover:
+        if box.on_state_changed != nil {
+            box.on_state_changed(box, .Default)
+        }
+        if box.style_sheet != nil {
+            box_apply_style(box, box.style_sheet.box.default)
+        }
         box.state = .Default
-        animate_color(&box.style.background_color, GREEN, 0.3)
-        animate_float(&box.style.padding_bottom, 10, 0.2)
     }
 }
 
 update_box :: proc(box: ^Box) {
-    if (box.id == "anim") { // TODO: Fix. Note: temporally hard-coded for the example
-        mouse_pos := rl.GetMousePosition()
-        box_rect := rl.Rectangle{box.global_position.x, box.global_position.y, box.size.x, box.size.y}
-        collide := rl.CheckCollisionPointRec(mouse_pos, box_rect)
-        if box.state == .Default && collide {
-            box_change_state(box)
-        }
-        if box.state == .Hover && !collide {
-            box_change_state(box)
-        }
+    mouse_pos := rl.GetMousePosition()
+    box_rect := rl.Rectangle{box.global_position.x, box.global_position.y, box.size.x, box.size.y}
+    collide := rl.CheckCollisionPointRec(mouse_pos, box_rect)
+    if box.state == .Default && collide {
+        box_change_state(box)
+    }
+    if box.state == .Hover && !collide {
+        box_change_state(box)
     }
 
     for child in box.children do element_update(child)
@@ -225,7 +242,7 @@ handle_primary_axis_sizing :: proc(box: ^Box, primary_axis: int) {
 
 calculate_gaps :: proc(box: ^Box) -> f32 {
     if len(box.children) == 0 do return 0
-    return f32(len(box.children) - 1) * box.style.gap
+    return f32(len(box.children) - 1) * box.gap
 }
 
 sum_child_sizes :: proc(box: ^Box, axis: int) -> f32 {
