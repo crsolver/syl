@@ -6,7 +6,7 @@ import "core:fmt"
 
 Transition :: struct {
     duration: f32,
-    easing: ease.Ease,
+    ease: ease.Ease,
 }
 
 Animatable_Property :: enum {
@@ -76,7 +76,7 @@ animate_float:: proc(target: ^f32, end_val: f32, duration: f32, easing: ease.Eas
         }
     }
 
-    //if target^ == end_val do return
+    if target^ == end_val do return
 
     append(&transition_manager.transitions, Float_Transition{
         target   = target,
@@ -96,7 +96,13 @@ animate_color :: proc(target: ^[4]u8, end_val: [4]u8, duration: f32, easing: eas
             break
         }
     }
-    //if target^ == end_val do return
+
+    if duration == 0 {
+        target^ = end_val
+        return
+    }
+
+    if target^ == end_val do return
 
     append(&transition_manager.color_transitions, Color_Transition{
         target   = target,

@@ -28,32 +28,8 @@ Text :: struct {
 	wrap: Text_Wrap,
 	line_space: f32,
 	lines: [dynamic]Text_Line,
-	overrides: bit_set[Text_Property]
-}
-
-text :: proc(
-	content: string = "",
-    ref:              Maybe(^^Text) = nil,
-	font_size: i32 = 18,
-	color: Maybe([4]u8) = nil,
-	wrap: bool = true,
-) -> ^Element {
-	text := new(Text)
-    if r, ok := ref.?; ok {
-        r^ = text
-    }
-	text.type = .Text
-	text.sizing = {.Expand, .Expand}
-	if wrap {
-		text.wrap = .Word
-	}
-	text.style.font_size = font_size
-	text.content = content
-	if val, ok := color.?; ok {
-		text.style.color = val
-		text.overrides += {.Color}
-	}
-	return text
+	overrides: bit_set[Text_Property],
+	is_button_text: bool
 }
 
 text_fit:: proc(text: ^Text) -> (f32, f32) {
@@ -185,4 +161,58 @@ text_update_positions :: proc(text: ^Text) {
 		line.global_position = cursor
         cursor.y += line.size.y + text.line_space
     }
+}
+
+text_set_content :: proc(label: ^Text, format: string, args: ..any) {
+    delete(label.content)  // Safe to call on empty strings
+    label.content = fmt.aprintf(format, ..args)
+}
+
+// Style ______________________________________________________________________
+
+Text_Style :: struct {
+	color: [4]u8,
+	font_size: i32,
+}
+
+Text_Style_Delta :: struct {
+	color: Maybe([4]u8),
+	font_size: Maybe(i32),
+}
+
+text_set_style_from_box_style :: proc(text: ^Text, style: Box_Style) {
+	text.style.color = style.text_color
+	text.style.font_size = style.font_size
+}
+
+text_set_style_from_box_style_delta :: proc(text: ^Text, delta: Box_Style_Delta, default: Box_Style) {
+	if val, ok := delta.text_color.?; ok {
+		text.style.color = val
+	} else {
+		text.style.color = default.text_color
+	}
+	if val, ok := delta.text_color.?; ok {
+		text.style.color = val
+	} else {
+		text.style.font_size = default.font_size
+	}
+}
+
+text_set_style_delta :: proc(text: ^Text, color: [4]u8, font_size: i32) {
+	text.style.color = color
+	text.style.font_size = font_size
+}
+
+text_appy_style :: proc(text: ^Text, style: Text_Style) {
+	text.style.color = style.color
+	text.style.font_size = style.font_size
+}
+
+text_appy_style_delta :: proc(text: ^Text, style: Text_Style_Delta, default: Text_Style) {
+	if val, ok := style.color.?; ok {
+		text.style.color = val
+	}
+	if val, ok := style.font_size.?; ok {
+		text.style.font_size = val
+	}
 }

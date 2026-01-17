@@ -21,13 +21,13 @@ Box :: struct {
 	border_color: [4]u8,
 	border_radius: f32,
 	padding: [4]f32, // top, right, bottom, left
-	transitions: map[Animatable_Property]Transition_Setup,
+	transitions: map[Animatable_Property]Transition,
 	gap: f32,padding_left: f32,
     state: Box_State,
     layout_direction: Layout_Direction,
     on_state_changed: proc(e: ^Element, to: Box_State),
 	overrides: bit_set[Box_Property],
-    was_hovered: bool,
+    box_handler: Maybe(MessageHandler(Box))
 }
 
 Layout_Direction :: enum {
@@ -51,8 +51,8 @@ calculate_layout :: proc(element: ^Element) {
 
 // Calculate minimum required sizes bottom-up
 element_fit:: proc(element: ^Element, axis: int) -> (f32, f32) {
-    #partial switch element.type {
-    case .Box:
+    switch element.type {
+    case .Box, .Button:
         return box_fit(cast(^Box)element, axis)
     case .Text:
         if axis == 0 do return text_fit(cast(^Text)element)
@@ -114,16 +114,18 @@ calculate_available_space :: proc(box: ^Box, axis: int) -> f32 {
 }
 
 calculate_padding :: proc(box: ^Box, axis: int) -> f32 {
+    //  0    1        2     3
+    // top, right, bottom, left
     if axis == 0 { 
-        return box.padding[3] + box.padding[1]
+        return box.padding[1] + box.padding[3] // right, left: 1, 3
     } else { 
-        return box.padding[0] + box.padding[3]
+        return box.padding[0] + box.padding[2] // top, bottom: 0, 2
     }
 }
 
 element_expand_collapse :: proc(element: ^Element, axis: int) {
     #partial switch element.type {
-    case .Box:
+    case .Box, .Button:
         box_expand_collapse(cast(^Box)element, axis)
 	}
 }
@@ -139,7 +141,7 @@ remove_item :: proc(array: ^[dynamic]$T, item: T) {
 
 update_positions :: proc(element: ^Element) {
     #partial switch element.type {
-    case .Box:
+    case .Box, .Button:
         box_update_positions(cast(^Box)element)
     case .Text:
         text_update_positions(cast(^Text)element)
@@ -168,24 +170,17 @@ box_update_positions:: proc(box: ^Box) {
     }
 }
 
-box_change_state :: proc(box: ^Box) {
-    switch box.state {
-    case .Default:
-        if box.on_state_changed != nil {
-            box.on_state_changed(box, .Hover)
-        }
-        box.state = .Hover
-        if box.style_sheet != nil {
-            box_apply_style(box, box.style_sheet.box.hover)
-        }
-    case .Hover:
-        if box.on_state_changed != nil {
-            box.on_state_changed(box, .Default)
-        }
-        box.state = .Default
-        if box.style_sheet != nil {
-            box_apply_style(box, box.style_sheet.box.default)
-        }
+box_change_state :: proc(box: ^Box, state: Box_State) {
+    if box.on_state_changed != nil {
+        box.on_state_changed(box, state)
+    }
+
+    box.state = state
+    if box.style_sheet == nil do return
+
+    switch state {
+    case .Default: box_apply_style_default(box, box.style_sheet.box.default)
+    case .Hover:   box_apply_style_delta(box, box.style_sheet.box.hover, box.style_sheet.box.default)
     }
 }
 
@@ -193,12 +188,11 @@ update_box :: proc(box: ^Box) {
     mouse_pos := rl.GetMousePosition()
     box_rect := rl.Rectangle{box.global_position.x, box.global_position.y, box.size.x, box.size.y}
     collide := rl.CheckCollisionPointRec(mouse_pos, box_rect)
-    if !box.was_hovered && box.state == .Default && collide {
-        box_change_state(box)
-        box.was_hovered = true
+
+    if box.state == .Default && collide {
+        box_change_state(box, .Hover)
     } else if box.state == .Hover && !collide {
-        box_change_state(box)
-        box.was_hovered = false
+        box_change_state(box, .Default)
     }
 
     for child in box.children do element_update(child)
@@ -435,14 +429,106 @@ find_largest_and_second :: proc(elements: [dynamic]^Element, axis: int) -> (f32,
     return largest, second_largest
 }
 
-center :: proc(content: ^Element) -> ^Element {
-    return box(sizing=Expand, children = {
-        box(sizing=Expand),
-        box(sizing=Expand, layout_direction = .Left_To_Right, children = {
-            box(sizing=Expand),
-            content,
-            box(sizing=Expand),
-        }),
-        box(sizing=Expand),
-    })
+
+// Style ______________________________________________________________________
+
+Box_State_Styles :: struct {
+	default: Box_Style,
+	hover: Box_Style_Delta,
+}
+
+Box_Style:: struct {
+    text_color: [4]u8,
+    font_size: i32,
+	background_color: [4]u8,
+	border_color: [4]u8,
+	border_radius: f32,
+	padding: [4]f32,
+	transitions: Box_Transitions,
+	gap: f32,
+}
+
+Box_Style_Delta :: struct {
+    text_color: Maybe([4]u8),
+    font_size: Maybe(i32),
+	background_color: Maybe([4]u8),
+	border_color: Maybe([4]u8),
+	border_radius: Maybe(f32),
+	padding: Maybe([4]f32),
+	padding_top: Maybe(f32),
+	padding_right: Maybe(f32),
+	padding_bottom: Maybe(f32),
+	padding_left: Maybe(f32),
+	transitions: Maybe(Box_Transitions),
+	gap: Maybe(f32),
+}
+
+Box_Transitions:: struct {
+	background_color: Transition,
+	padding: Transition,
+}
+
+box_apply_style_default :: proc(box: ^Box, style: Box_Style) {
+	if !(.Gap in box.overrides) {
+		box.gap = style.gap
+	}
+
+	if !(.Background_Color in box.overrides) {
+		t := style.transitions.background_color
+		if t.duration > 0 {
+			animate_color(&box.background_color, style.background_color, t.duration, t.ease)
+		} else {
+			box.background_color = style.background_color
+		}
+		box.background_color = style.background_color
+	}
+
+	if !(.Border_Color in box.overrides) {
+		box.border_color = style.border_color
+	}
+
+	if !(.Border_Radius in box.overrides) {
+		box.border_radius = style.border_radius
+	}
+
+	if !(.Padding in box.overrides) {
+		using style.transitions.padding
+        animate_float(&box.padding[0], style.padding[0], duration, ease)
+        animate_float(&box.padding[1], style.padding[1], duration, ease)
+        animate_float(&box.padding[2], style.padding[2], duration, ease)
+        animate_float(&box.padding[3], style.padding[3], duration, ease)
+	}
+}
+
+box_apply_style_delta:: proc(box: ^Box, delta: Box_Style_Delta, default: Box_Style) {
+	transitions := default.transitions
+
+	if val, ok := delta.transitions.?; ok {
+		transitions = val
+	}
+
+	if val, ok := delta.gap.?; ok && !(.Gap in box.overrides) {
+		box.gap = val 
+	}
+
+	if val, ok := delta.background_color.?; ok && !(.Background_Color in box.overrides) {
+		using transitions.background_color
+		animate_color(&box.background_color, val, duration, ease)
+	}
+
+	if val, ok := delta.border_color.?; ok && !(.Border_Color in box.overrides) {
+		box.border_color = val
+	}
+
+	if val, ok := delta.border_radius.?; ok && !(.Border_Radius in box.overrides) {
+        box.border_radius = val
+	}
+
+	if val, ok := delta.padding.?; ok && !(.Padding in box.overrides) {
+		using transitions.padding
+        animate_float(&box.padding[0], val[0], duration, ease)
+        animate_float(&box.padding[1], val[1], duration, ease)
+        animate_float(&box.padding[2], val[2], duration, ease)
+        animate_float(&box.padding[3], val[3], duration, ease)
+	}
 }

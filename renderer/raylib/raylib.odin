@@ -6,7 +6,7 @@ import "core:strings"
 
 draw :: proc(element: ^syl.Element) {
 	#partial switch element.type {
-	case .Box: box_draw(cast(^syl.Box)element)
+	case .Box, .Button: box_draw(cast(^syl.Box)element)
 	case .Text: text_draw(cast(^syl.Text)element)
 	}
 
