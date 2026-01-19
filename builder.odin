@@ -1,14 +1,13 @@
 package syl
 
-import "core:slice"
 import "core:mem"
 import "base:runtime"
 import "core:fmt"
 
-box_init :: proc(
-	box: 			  ^Box,
+layout_box_init :: proc(
+	box: 			  ^Layout_Box,
 	children:         Maybe([]^Element), 
-	style_sheet:      ^Style_Sheet,
+	style_sheet:      ^Style_Sheet, 
 	layout_direction: Layout_Direction, 
 	gap:              Maybe(f32),
 	padding:          Maybe([4]f32),
@@ -89,6 +88,7 @@ box_init :: proc(
 	if style_sheet != nil {
 		element_apply_style_recursive(box, style_sheet)
 	}
+
 }
 
 box :: proc(
@@ -110,14 +110,16 @@ box :: proc(
     height_sizing:    Maybe(SizingKind) = nil,
     id: Maybe(string) = nil,
 	on_state_changed: 	  proc(e: ^Element, to: Box_State) = nil,
+	style:  		  ^Box_Styles_Override = nil,
 ) -> ^Box {
 	box := new(Box)
 	is_owner := false
 	if h, ok := handler.?; ok {
 		box = h.base
-		box.handler_data = HandlerData{
-			owner = h.element,
-			handler = h.handler
+		box.handler = Handler{
+			element = h.element,
+			handler = h.handler,
+			destroy = h.destroy,
 		}
 		is_owner = true
 	} else {
@@ -129,7 +131,9 @@ box :: proc(
 		r^ = box
 	}
 
-	box_init(box, children, style_sheet, layout_direction, gap, padding, background_color, border_radius, border_color, size, width, height, sizing, width_sizing, height_sizing)
+	box.style = style
+
+	layout_box_init(box, children, style_sheet, layout_direction, gap, padding, background_color, border_radius, border_color, size, width, height, sizing, width_sizing, height_sizing)
 	if is_owner {
 		element_set_owner(box, box)
 	}
@@ -183,13 +187,13 @@ copy_any_to_heap :: proc(val: any, allocator := context.allocator) -> any {
 }
 
 button:: proc(
-	children:       ..^Element, 
+	children:      ..^Element, 
 	handler:		  Maybe(MessageHandler(Button)) = nil,
     ref:              Maybe(^^Button) = nil,
-    style_sheet:      ^Style_Sheet= nil,
+    style_sheet:     ^Style_Sheet= nil,
 	layout_direction: Layout_Direction = .Top_To_Bottom, 
 	gap:              Maybe(f32) = nil,
-	text_content:             Maybe(string) = nil,
+	text_content:     Maybe(string) = nil,
 	padding:          Maybe([4]f32) = nil,
 	background_color: Maybe([4]u8) = nil,
 	border_radius:    Maybe(f32) = nil,
@@ -200,16 +204,17 @@ button:: proc(
 	sizing: 		  Sizing = {.Fit, .Fit},
     width_sizing:     Maybe(SizingKind) = nil,
     height_sizing:    Maybe(SizingKind) = nil,
+    style:    		 ^Button_Styles_Override = nil,
 	on_click: 		  Maybe(any) = nil,
-	on_state_changed: 	  proc(e: ^Element, to: Box_State) = nil,
 ) -> ^Button {
 	button: ^Button
 	is_owner := false
 	if h, ok := handler.?; ok {
 		button = h.base
-		button.handler_data = HandlerData{
-			owner = h.element,
-			handler = h.handler
+		button.handler = Handler{
+			element = h.element,
+			handler = h.handler,
+			destroy = h.destroy,
 		}
 		is_owner = true
 	} else {
@@ -228,6 +233,8 @@ button:: proc(
 		append(&children_list, child)
 	}
 
+	button.style = style
+
 	if val, ok := on_click.?; ok {
 		button.on_click = copy_any_to_heap(val)
 	}
@@ -239,7 +246,7 @@ button:: proc(
 		append_elem(&children_list, button.text)
 	}
 
-	box_init(button, children_list[:], style_sheet, layout_direction, gap, padding, background_color, border_radius, border_color, size, width, height, sizing, width_sizing, height_sizing)
+	layout_box_init(button, children_list[:], style_sheet, layout_direction, gap, padding, background_color, border_radius, border_color, size, width, height, sizing, width_sizing, height_sizing)
 	if is_owner {
 		element_set_owner(button, button)
 	}
@@ -256,21 +263,4 @@ center :: proc(content: ^Element) -> ^Element {
         }),
         box(sizing=Expand, background_color=[4]u8{0,0,0,0}),
     })
-}
-
-Custom :: struct($T: typeid, $U: typeid) {
-	handler: proc(T, U)
-}
-
-Custom2 :: struct {
-	handler: proc(any, any)
-}
-
-custom :: proc($T: typeid, $U: typeid, handler: proc(T, U)) -> ^Custom2 {
-	t := new(Custom2)
-	t.handler = handler
-	return t
-}
-
-call :: proc($T: typeid, $U: typeid) -> ^T {
 }

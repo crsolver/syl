@@ -7,25 +7,26 @@ transition_manager := Transition_Manager{}
 
 MessageHandler :: struct($T: typeid) {
 	handler: proc(rawptr, rawptr),
+	destroy: proc(rawptr),
 	base: ^T,
 	element: rawptr,
-	message_type: typeid,
 }
 
-make_handler :: proc(owner: ^$E, $B:typeid, $M: typeid, update_proc: proc(^E, M)) -> MessageHandler(B) where (intrinsics.type_field_type(E, "base") == B) {
+make_handler :: proc(element: ^$E, $B:typeid, $M: typeid, update_proc: proc(^E, M), destroy_proc: proc(^E)) -> MessageHandler(B) where (intrinsics.type_field_type(E, "base") == B) {
 	return {
-		element = owner,
-		base = &owner.base,
-		handler = (proc(rawptr, rawptr))(update_proc),
-		message_type = M,
+		element = element,
+		base = &element.base,
+		handler = auto_cast update_proc,
+		destroy = auto_cast destroy_proc,
 	}
 }
 
 Element_Type :: enum { Box, Text, Button }
 
-HandlerData :: struct {
-	owner: rawptr,
-	handler: proc(rawptr, rawptr)
+Handler :: struct {
+	element: rawptr,
+	handler: proc(rawptr, rawptr),
+	destroy: proc(rawptr)
 }
 
 Element :: struct {
@@ -39,9 +40,10 @@ Element :: struct {
 	min_size: [2]f32,
 	sizing: Sizing,
 	style_sheet: ^Style_Sheet,
-	handler: proc(rawptr, rawptr),
-	handler_data: Maybe(HandlerData),
+	handler: Maybe(Handler),
 }
+
+
 
 SizingKind :: enum {
 	Fit,
@@ -97,4 +99,48 @@ element_set_owner :: proc(element: ^Element, owner: ^Element) {
 			element_set_owner(child, owner)
 		}
 	}
+}
+
+clear_children :: proc(element: ^Element) {
+	box := cast(^Box)element
+	if box == nil do return
+	
+	// Free all children elements
+	for child in box.children {
+		element_destroy(child)
+	}
+	
+	// Clear the dynamic array
+	clear(&box.children)
+}
+
+element_append :: proc(element: ^Element, child: ^Element) {
+	append_elem(&element.children, child)
+	child.parent = element // Will be set by the parent later if needed
+}
+
+base_element_deinit :: proc(element: ^Element) {
+    if element == nil do return
+    for child in element.children do element_destroy(child) 
+    delete(element.children)
+}
+
+element_destroy :: proc(element: ^Element) {
+    if element == nil do return
+
+	if h, ok := element.handler.?; ok {
+		switch element.type {
+			case .Text:   text_deinit(cast(^Text)element)
+			case .Box:    box_deinit(cast(^Box)element)
+			case .Button: button_deinit(cast(^Button)element)
+		}
+		h.destroy(h.element)
+		return
+	}
+
+ 	switch element.type {
+		case .Text:   text_destroy(cast(^Text)element)
+		case .Box:    box_destroy(cast(^Box)element)
+		case .Button: button_destroy(cast(^Button)element)
+    }
 }

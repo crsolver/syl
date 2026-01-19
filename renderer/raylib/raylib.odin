@@ -4,13 +4,14 @@ import rl "vendor:raylib"
 import syl "../.."
 import "core:strings"
 
-draw :: proc(element: ^syl.Element) {
+
+render :: proc(element: ^syl.Element) {
 	#partial switch element.type {
 	case .Box, .Button: box_draw(cast(^syl.Box)element)
 	case .Text: text_draw(cast(^syl.Text)element)
 	}
 
-	for e in element.children do draw(e)
+	for e in element.children do render(e)
 }
 
 box_draw :: proc(box: ^syl.Box) {
@@ -52,11 +53,12 @@ text_draw :: proc(text: ^syl.Text) {
         line_cstr := strings.clone_to_cstring(line.content)
         defer delete(line_cstr)
         
-        rl.DrawText(
+        rl.DrawTextEx(
+			syl.font,
             line_cstr,
-            i32(line.global_position.x),
-            i32(line.global_position.y),
-            font_size,
+            line.global_position,
+            f32(font_size),
+			1,
             cast(rl.Color)text.style.color,
         )
     }

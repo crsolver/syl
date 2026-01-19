@@ -2,3 +2,4 @@ ols.json
 notes.txt
 index.html
 .gitignore
+/examples/ignore

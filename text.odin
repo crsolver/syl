@@ -4,6 +4,8 @@ import rl "vendor:raylib"
 import "core:strings"
 import "core:fmt"
 
+font: rl.Font
+
 Text_Wrap :: enum {
     None,
     Word,
@@ -59,7 +61,7 @@ text_fit:: proc(text: ^Text) -> (f32, f32) {
 
 	for word in words {
 		cstr := strings.clone_to_cstring(word)
-		word_width := f32(rl.MeasureText(cstr, i32(text.style.font_size)))
+		word_width := f32(rl.MeasureText(cstr, text.style.font_size))
 		delete(cstr)
 		max_word_width = max(max_word_width, word_width)
 	}
@@ -185,17 +187,29 @@ text_set_style_from_box_style :: proc(text: ^Text, style: Box_Style) {
 	text.style.font_size = style.font_size
 }
 
-text_set_style_from_box_style_delta :: proc(text: ^Text, delta: Box_Style_Delta, default: Box_Style) {
-	if val, ok := delta.text_color.?; ok {
-		text.style.color = val
-	} else {
-		text.style.color = default.text_color
+
+text_set_style_from_box_style_delta :: proc(text: ^Text, new: Box_Style_Delta, delta: Maybe(Box_Style_Delta), default: Box_Style) {
+	text_color := default.text_color
+	size := default.font_size
+
+	if d, ok := delta.?; ok {
+		if t, ok := d.text_color.?; ok {
+			text_color = t
+		}
+		if f, ok := d.font_size.?; ok {
+			size = f
+		}
 	}
-	if val, ok := delta.text_color.?; ok {
-		text.style.color = val
-	} else {
-		text.style.font_size = default.font_size
+
+	if t, ok := new.text_color.?; ok {
+		text_color = t
 	}
+	if f, ok := new.font_size.?; ok {
+		size = f
+	}
+
+	text.style.color = text_color
+	text.style.font_size = size
 }
 
 text_set_style_delta :: proc(text: ^Text, color: [4]u8, font_size: i32) {
@@ -215,4 +229,15 @@ text_appy_style_delta :: proc(text: ^Text, style: Text_Style_Delta, default: Tex
 	if val, ok := style.font_size.?; ok {
 		text.style.font_size = val
 	}
+}
+
+text_deinit :: proc(text: ^Text) {
+	base_element_deinit(&text.base)	
+	delete(text.lines)
+	delete(text.content)
+}
+
+text_destroy:: proc(text: ^Text) {
+	text_deinit(text)	
+	free(text)
 }
