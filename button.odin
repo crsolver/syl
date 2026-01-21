@@ -89,8 +89,11 @@ update_button :: proc(button: ^Button) {
             button_change_state(button, .Press)
         }
     } else if collide {
-        if button.button_state != .Hover {
+        if button.button_state == .Default {
             button_dispatch(button, button.on_mouse_over)
+            button_change_state(button, .Hover)
+        } else if button.button_state == .Press {
+            // Transition from Press to Hover without dispatching
             button_change_state(button, .Hover)
         }
     } else {
