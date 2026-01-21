@@ -29,4 +29,4 @@ With a retained-mode approach, Syl maintains a persistent representation of the 
 ### Contributing
 Syl is an open and exploratory project. Contributions, experiments, and discussions around its design and development are strongly encouraged, especially ideas that help shape the final architecture and long-term direction of the library.
 
-Join the [Discord server](https://discord.gg/FWz3JxXt) for discussion and feedback.
+Join the [Discord server](https://discord.gg/guHwySTgtZ) for discussion and feedback.
