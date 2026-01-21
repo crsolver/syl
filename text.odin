@@ -1,10 +1,7 @@
 package syl
 
-import rl "vendor:raylib"
 import "core:strings"
 import "core:fmt"
-
-font: rl.Font
 
 Text_Wrap :: enum {
     None,
@@ -32,13 +29,11 @@ Text :: struct {
 	overrides: bit_set[Text_Property],
 	is_button_text: bool,
 	color: [4]u8,
-	font_size: i32,
+	font_size: int,
 }
 
 text_fit:: proc(text: ^Text) -> (f32, f32) {
-	cstr := strings.clone_to_cstring(text.content)
-	defer delete(cstr)
-	width:f32 = f32(rl.MeasureText(cstr, text.font_size))
+	width:f32 = f32(ctx.measure_text(text.content, text.font_size))
 
 	clear(&text.lines)
 
@@ -61,9 +56,7 @@ text_fit:: proc(text: ^Text) -> (f32, f32) {
 	defer delete(words)
 
 	for word in words {
-		cstr := strings.clone_to_cstring(word)
-		word_width := f32(rl.MeasureText(cstr, text.font_size))
-		delete(cstr)
+		word_width := f32(ctx.measure_text(word, text.font_size))
 		max_word_width = max(max_word_width, word_width)
 	}
 	font_size := text.font_size	
@@ -97,14 +90,14 @@ text_wrap :: proc(e: ^Element) {
 			return
 		}
 		
-		space_width := measure_text(" ", text.font_size)
+		space_width := f32(ctx.measure_text(" ", text.font_size))
 		
 		current_line := strings.builder_make()
 		defer strings.builder_destroy(&current_line)
 		current_width: f32 = 0
 		
 		for word in words {
-			word_width := measure_text(word, text.font_size)
+			word_width := f32(ctx.measure_text(word, text.font_size))
 			
 			// Check if word fits on current line
 			test_width := word_width
@@ -140,13 +133,8 @@ text_wrap :: proc(e: ^Element) {
 	}
 }
 
-measure_text :: proc(s: string, font_size: i32) -> f32 {
-	cstr := strings.clone_to_cstring(s)
-	defer delete(cstr)
-	return f32(rl.MeasureText(cstr, font_size))
-}
 
-add_line :: proc(lines: ^[dynamic]Text_Line, content: string, width: f32, font_size: i32) {
+add_line :: proc(lines: ^[dynamic]Text_Line, content: string, width: f32, font_size: int) {
 	append(lines, Text_Line{
 		content = strings.clone(content),
 		size = {width, f32(font_size)},
@@ -175,12 +163,12 @@ text_set_content :: proc(label: ^Text, format: string, args: ..any) {
 
 Text_Style :: struct {
 	color: [4]u8,
-	font_size: i32,
+	font_size: int,
 }
 
 Text_Style_Override:: struct {
 	color: Maybe([4]u8),
-	font_size: Maybe(i32),
+	font_size: Maybe(int),
 }
 
 text_set_style_from_box_style :: proc(text: ^Text, style: ^Box_Style_Override) {
@@ -226,7 +214,7 @@ text_set_style_from_box_style_override :: proc(text: ^Text, new: Box_Style_Overr
 	text.font_size = size
 }
 
-text_set_style_override :: proc(text: ^Text, color: [4]u8, font_size: i32) {
+text_set_style_override :: proc(text: ^Text, color: [4]u8, font_size: int) {
 	text.color = color
 	text.font_size = font_size
 }

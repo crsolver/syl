@@ -14,7 +14,7 @@ update_box :: proc(box: ^Box) {
 
 Box_Style:: struct {
     text_color: [4]u8,
-    font_size: i32,
+    font_size: int,
 	background_color: [4]u8,
 	border_color: [4]u8,
 	border_radius: f32,
@@ -25,7 +25,7 @@ Box_Style:: struct {
 
 Box_Style_Override :: struct {
     text_color: Maybe([4]u8),
-    font_size: Maybe(i32),
+    font_size: Maybe(int),
 	background_color: Maybe([4]u8),
 	border_color: Maybe([4]u8),
 	border_radius: Maybe(f32),

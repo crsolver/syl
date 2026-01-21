@@ -160,3 +160,51 @@ element_destroy :: proc(element: ^Element) {
 		case .Button: button_destroy(cast(^Button)element)
     }
 }
+
+Mouse :: enum u32 {
+	LEFT,
+	RIGHT,
+	MIDDLE,
+}
+Mouse_Set :: distinct bit_set[Mouse; u32]
+
+App :: struct {
+	ctx: Context,
+	root: ^Element
+}
+
+ctx: Context
+
+Context :: struct {
+	mouse_pos: [2]f32,
+	mouse_down_bits:	 Mouse_Set,
+	mouse_pressed_bits:	 Mouse_Set,
+	mouse_released_bits: Mouse_Set,
+	measure_text: proc(string, int) -> int
+}
+
+update :: proc(el: ^Element) {
+	calculate_layout(el)
+	element_update(el)
+	update_transitions()
+}
+
+input_mouse_move :: proc(pos: [2]f32) {
+	ctx.mouse_pos = pos
+}
+
+input_mouse_down :: proc(btn: Mouse) {
+	ctx.mouse_down_bits    += {btn}
+	ctx.mouse_pressed_bits += {btn}
+}
+
+input_mouse_up:: proc(btn: Mouse) {
+	ctx.mouse_down_bits -= {btn}
+	ctx.mouse_released_bits += {btn}
+}
+
+clear_context :: proc() {
+	ctx.mouse_down_bits = {} // clear
+	ctx.mouse_pressed_bits = {} // clear
+	ctx.mouse_released_bits = {} // clear
+}

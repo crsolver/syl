@@ -141,7 +141,7 @@ box :: proc(
 text :: proc(
 	content: string = "",
     ref:              Maybe(^^Text) = nil,
-	font_size: i32 = 18,
+	font_size: int = 18,
 	color: Maybe([4]u8) = nil,
 	wrap: bool = true,
 ) -> ^Text {

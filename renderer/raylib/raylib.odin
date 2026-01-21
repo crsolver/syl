@@ -3,8 +3,39 @@ package raylib_renderer
 import rl "vendor:raylib"
 import syl "../.."
 import "core:strings"
-import "core:math"
 
+mouse_buttons_map := [syl.Mouse]rl.MouseButton{
+	.LEFT    = .LEFT,
+	.RIGHT   = .RIGHT,
+	.MIDDLE  = .MIDDLE,
+}
+
+init :: proc() {
+	syl.ctx.measure_text = measure_text
+}
+
+measure_text :: proc(s: string, font_size: int) -> int {
+	cstr := strings.clone_to_cstring(s)
+	defer delete(cstr)
+	return int(rl.MeasureText(cstr, i32(font_size)))
+}
+
+update :: proc(root: ^syl.Element) {
+	assert(syl.ctx.measure_text != nil)
+	syl.input_mouse_move(rl.GetMousePosition())
+
+	for button_rl, button_mu in mouse_buttons_map {
+		switch {
+		case rl.IsMouseButtonPressed(button_rl):
+			syl.input_mouse_down(button_mu)
+		case rl.IsMouseButtonReleased(button_rl):
+			syl.input_mouse_up(button_mu)
+		}
+	}
+
+	syl.update(root)
+	syl.clear_context()
+}
 
 render :: proc(element: ^syl.Element) {
 	#partial switch element.type {
@@ -47,7 +78,7 @@ get_roundness :: proc(rect_size: rl.Vector2, radius_pixels: f32) -> f32 {
 text_draw :: proc(text: ^syl.Text) {
     if len(text.lines) == 0 do return
 
-    font_size: i32 = text.font_size
+    font_size: i32 = auto_cast text.font_size
     line_height: f32 = f32(font_size)
 
     //rl.DrawRectangleLines(i32(text.global_position.x), i32(text.global_position.y), i32(text.size.x), i32(text.size.y), rl.GRAY)
@@ -56,12 +87,11 @@ text_draw :: proc(text: ^syl.Text) {
         line_cstr := strings.clone_to_cstring(line.content)
         defer delete(line_cstr)
         
-        rl.DrawTextEx(
-			syl.font,
+        rl.DrawText(
             line_cstr,
-            line.global_position,
-            f32(font_size),
-			1,
+            i32(line.global_position.x),
+            i32(line.global_position.y),
+            font_size,
             cast(rl.Color)text.color,
         )
     }

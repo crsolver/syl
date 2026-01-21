@@ -131,14 +131,13 @@ main :: proc() {
 		gap=4,
 	)
 
+	renderer.init()
 	for !rl.WindowShouldClose() {
-		syl.calculate_layout(app)
-		syl.element_update(app)
-		syl.update_transitions()
+		renderer.update(app)
 
 		rl.BeginDrawing()
-		rl.ClearBackground(cast(rl.Color)BLACK)
-		renderer.render(app)
+			rl.ClearBackground(cast(rl.Color)BLACK)
+			renderer.render(app)
 		rl.EndDrawing()
 	}
 

@@ -1,9 +1,5 @@
 package syl
 
-import rl "vendor:raylib"
-import "core:fmt"
-import "core:mem"
-
 Button_State :: enum {
     Default,
     Hover,
@@ -15,7 +11,6 @@ Button :: struct {
     text: ^Text,
     style: ^Button_Styles_Override,
 	button_state: Button_State,
-    on_button_state_changed: proc(e: ^Button, to: Button_State),
     on_click: Maybe(any),
     on_mouse_over: Maybe(any),
 }
@@ -37,10 +32,6 @@ button_deinit :: proc(button: ^Button) {
 }
 
 button_change_state :: proc(button: ^Button, state: Button_State) {
-	if button.on_button_state_changed != nil {
-		button.on_button_state_changed(button, state)
-	}
-
     button.button_state = state
 
 	if button.style_sheet == nil do return
@@ -53,14 +44,11 @@ button_change_state :: proc(button: ^Button, state: Button_State) {
         press =    &button.style.press
     }
     
-    rl.SetMouseCursor(.DEFAULT) 
-
     switch state {
     case .Default: 
         button_set_style(button, nil)
         if button.text != nil do text_set_style_from_box_style(button.text, nil)
     case .Hover:
-        rl.SetMouseCursor(.POINTING_HAND) 
         button_set_style(button, hover)
         if button.text != nil do text_set_style_from_box_style(button.text, hover)
     case .Press:   
@@ -79,12 +67,23 @@ button_dispatch :: proc(button: ^Button, message: Maybe(any)) {
     }
 }
 
-update_button :: proc(button: ^Button) {
-    mouse_pos := rl.GetMousePosition()
-    box_rect := rl.Rectangle{button.global_position.x, button.global_position.y, button.size.x, button.size.y}
-    collide := rl.CheckCollisionPointRec(mouse_pos, box_rect)
+Rectangle :: struct {
+    x: f32,
+    y: f32,
+    width: f32,
+    height: f32,
+}
 
-    if collide && rl.IsMouseButtonPressed(.LEFT) {
+check_collision_point_rect :: proc(point: [2]f32, rect: Rectangle) -> bool {
+    return point.x >= rect.x && point.x <= (rect.x + rect.width) &&
+           point.y >= rect.y && point.y <= (rect.y + rect.height)
+}
+
+update_button :: proc(button: ^Button) {
+    box_rect := Rectangle{button.global_position.x, button.global_position.y, button.size.x, button.size.y}
+    collide := check_collision_point_rect(ctx.mouse_pos, box_rect)
+
+    if collide && ctx.mouse_pressed_bits == {.LEFT} {
         if button.button_state != .Press {
             button_dispatch(button, button.on_click)
             button_change_state(button, .Press)

@@ -31,7 +31,7 @@ style_sheet := syl.Style_Sheet {
 			border_color = MUTED,
 			transitions = {
 				background_color = {0.2, .Cubic_Out},
-				padding = {0.3, .Exponential_Out},
+				padding = {0.1, .Cubic_Out},
 			},
 		},
 		hover = {
@@ -108,11 +108,11 @@ game_menu_ui :: proc() -> ^Game_UI {
 		syl.center(
 			syl.box(
 				syl.box(gap=10, children = {
-					syl.button(text_content="START", width=200, on_mouse_over = Message.Start),
-					syl.button(text_content="SETTINGS", width=200, on_mouse_over = Message.Settings),
-					syl.button(text_content="NETWORK", width=200, on_mouse_over = Message.Network),
-					syl.button(text_content="CREDITS", width=200, on_mouse_over = Message.Credits),
-					syl.button(text_content="EXIT", width=200, on_mouse_over = Message.Exit),
+					syl.button(text_content="START", size={200,40}, on_mouse_over = Message.Start),
+					syl.button(text_content="SETTINGS", size={200,40}, on_mouse_over = Message.Settings),
+					syl.button(text_content="NETWORK", size={200,40}, on_mouse_over = Message.Network),
+					syl.button(text_content="CREDITS", size={200,40}, on_mouse_over = Message.Credits),
+					syl.button(text_content="EXIT", size={200,40}, on_mouse_over = Message.Exit),
 				}),
 				syl.box(ref=&game_ui.container, width=200, height_sizing=.Expand),
 				layout_direction = .Left_To_Right
@@ -125,25 +125,25 @@ game_menu_ui :: proc() -> ^Game_UI {
 
 start :: proc() -> ^syl.Box {
 	return syl.box(gap=10, children = {
-		syl.button(text_content="CONTINUE", width=200),
-		syl.button(text_content="NEW GAME", width=200),
+		syl.button(text_content="CONTINUE", size={200,40}),
+		syl.button(text_content="NEW GAME", size={200,40}),
 	}),
 }
 
 settings :: proc() -> ^syl.Box {
 	return syl.box(gap=10, children = {
-		syl.button(text_content="AUDIO", width=200),
-		syl.button(text_content="VIDEO", width=200),
-		syl.button(text_content="CONTROLS", width=200),
-		syl.button(text_content="GAMEPLAY", width=200),
+		syl.button(text_content="AUDIO", size={200,40}),
+		syl.button(text_content="VIDEO", size={200,40}),
+		syl.button(text_content="CONTROLS", size={200,40}),
+		syl.button(text_content="GAMEPLAY", size={200,40}),
 	}),
 }
 
 network :: proc() -> ^syl.Box {
 	return syl.box(gap=10, children = {
-		syl.button(text_content="CONNECT TO SERVER", width=240),
-		syl.button(text_content="HOST GAME", width=240),
-		syl.button(text_content="DISCONNECT", width=240),
+		syl.button(text_content="CONNECT TO SERVER", size={240,40}),
+		syl.button(text_content="HOST GAME", size={240,40}),
+		syl.button(text_content="DISCONNECT", size={240,40}),
 	}),
 }
 
@@ -161,8 +161,8 @@ exit :: proc() -> ^syl.Box {
 			syl.box(
 				syl.text("ARE YOU SURE?", wrap = false),
 				syl.box(
-					syl.button(text_content="YES", width=100),
-					syl.button(text_content="NO", width=100),
+					syl.button(text_content="YES", size={100,40}),
+					syl.button(text_content="NO", size={100,40}),
 					layout_direction = .Left_To_Right,
 					padding = 0,
 					gap = 10
@@ -179,16 +179,15 @@ main :: proc() {
 	rl.InitWindow(SCREEN_W, SCREEN_H, "Game Settings")
 	rl.SetTargetFPS(60)
 
-	app := game_menu_ui()
+	ui := game_menu_ui()
 
+	renderer.init()
 	for !rl.WindowShouldClose() {
-		syl.calculate_layout(app)
-		syl.element_update(app)
-		syl.update_transitions()
+		renderer.update(ui)
 
 		rl.BeginDrawing()
-		rl.ClearBackground(cast(rl.Color)BACKGROUND_COLOR)
-		renderer.render(app)
+			rl.ClearBackground(cast(rl.Color)BACKGROUND_COLOR)
+			renderer.render(ui)
 		rl.EndDrawing()
 	}
 
