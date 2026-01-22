@@ -9,12 +9,12 @@ SCREEN_W :: 800
 SCREEN_H :: 500
 
 BACKGROUND_COLOR :: [4]u8{17,45,58, 255}
+BLACK :: [4]u8{0,0,0, 255}
 WHITE :: [4]u8{255, 255, 255, 255}
 PRIMARY_COLOR :: [4]u8{236,155,92, 255} // orange
 SECONDARY_COLOR :: [4]u8{160,223,227, 255}
 PRIMARY_TEXT_COLOR :: [4]u8{25,16,0, 255} // black
 MUTED :: [4]u8{46,79,90, 255}
-
 
 style_sheet := syl.Style_Sheet {
 	box = {
@@ -29,7 +29,15 @@ style_sheet := syl.Style_Sheet {
 			font_size = 18,
 			background_color = BACKGROUND_COLOR,
 			padding = {10,30,10,30},
-			border_color = MUTED,
+			// border with different colors
+			border_color = {
+				PRIMARY_COLOR, // top
+				MUTED,         // right
+				MUTED,         // bottom
+				PRIMARY_COLOR, // left
+			},
+			border_thickness = {2,2,2,8},
+			border_radius = {20,0,0,0},
 			transitions = {
 				background_color = {0.2, .Cubic_Out},
 				padding = {0.1, .Cubic_Out},
@@ -175,10 +183,8 @@ exit :: proc() -> ^syl.Box {
 }
 
 main :: proc() {
-	rl.SetConfigFlags({.MSAA_4X_HINT, .VSYNC_HINT})
+	rl.SetConfigFlags({.VSYNC_HINT})
 	rl.InitWindow(SCREEN_W, SCREEN_H, "Game Settings")
-	rl.SetTargetFPS(60)
-
 	ui := game_menu_ui()
 
 	renderer.init()
