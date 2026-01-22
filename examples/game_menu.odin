@@ -4,7 +4,6 @@ import syl "../"
 import renderer "../renderer/raylib"
 import "core:math/ease"
 import rl "vendor:raylib"
-import "core:fmt"
 
 SCREEN_W :: 800
 SCREEN_H :: 500
@@ -15,6 +14,7 @@ PRIMARY_COLOR :: [4]u8{236,155,92, 255} // orange
 SECONDARY_COLOR :: [4]u8{160,223,227, 255}
 PRIMARY_TEXT_COLOR :: [4]u8{25,16,0, 255} // black
 MUTED :: [4]u8{46,79,90, 255}
+
 
 style_sheet := syl.Style_Sheet {
 	box = {
