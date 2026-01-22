@@ -6,21 +6,23 @@ import "core:math"
 
 Layout_layout_box_Property :: enum {
 	Gap,
-	Padding,
 	Background_Color,
 	Border_Color,
 	Border_Radius,
+    Border_Thickness,
+	Padding,
 }
 
 Layout_Box :: struct {
-	using element: Element,
+	using element:    Element,
     background_color: [4]u8,
-	border_color: [4]u8,
-	border_radius: f32,
-	padding: [4]f32,
-	gap: f32,padding_left: f32,
+	border_color:     [4][4]u8,
+    border_thickness: [4]f32,
+	border_radius:    [4]f32,
+	padding:          [4]f32,
+	gap:              f32,
     layout_direction: Layout_Direction,
-	overrides: bit_set[Layout_layout_box_Property],
+	overrides:        bit_set[Layout_layout_box_Property],
 }
 
 Layout_Direction :: enum {
@@ -423,41 +425,6 @@ find_largest_and_second :: proc(elements: [dynamic]^Element, axis: int) -> (f32,
     return largest, second_largest
 }
 
-
-// Style ______________________________________________________________________
-
-Layout_layout_box_State_Styles :: struct {
-	default: Layout_layout_box_Style,
-	hover: Layout_layout_box_Style_Delta,
-}
-
-Layout_layout_box_Style:: struct {
-    text_color: [4]u8,
-    font_size: i32,
-	background_color: [4]u8,
-	border_color: [4]u8,
-	border_radius: f32,
-	padding: [4]f32,
-	transitions: Layout_layout_box_Transitions,
-	gap: f32,
-}
-
-Layout_layout_box_Style_Delta :: struct {
-    text_color: Maybe([4]u8),
-    font_size: Maybe(i32),
-	background_color: Maybe([4]u8),
-	border_color: Maybe([4]u8),
-	border_radius: Maybe(f32),
-	padding: Maybe([4]f32),
-	transitions: Maybe(Layout_layout_box_Transitions),
-	gap: Maybe(f32),
-}
-
-Layout_layout_box_Transitions:: struct {
-	background_color: Transition,
-	padding: Transition,
-}
-
 layout_box_destroy:: proc(box: ^Layout_Box) {
     layout_box_deinit(box)
     free(box)
@@ -478,6 +445,7 @@ layout_box_set_style:: proc(box: ^Layout_Box, new: ^Box_Style_Override, style: ^
     background_color := default.background_color
     border_radius := default.border_radius
     border_color := default.border_color
+    border_thickness := default.border_thickness
 
     if style != nil {
         if g, ok := style.gap.?; ok do gap = g
@@ -485,6 +453,7 @@ layout_box_set_style:: proc(box: ^Layout_Box, new: ^Box_Style_Override, style: ^
         if bg, ok := style.background_color.?; ok do background_color = bg
         if br, ok := style.border_radius.?; ok do border_radius = br
         if bc, ok := style.border_color.?; ok do border_color = bc
+        if bt, ok := style.border_thickness.?; ok do border_thickness = bt
         if val, ok := style.transitions.?; ok {
             transitions = val
         }
@@ -496,6 +465,7 @@ layout_box_set_style:: proc(box: ^Layout_Box, new: ^Box_Style_Override, style: ^
         if bg, ok := new.background_color.?; ok do background_color = bg
         if br, ok := new.border_radius.?; ok do border_radius = br
         if bc, ok := new.border_color.?; ok do border_color = bc
+        if bt, ok := new.border_thickness.?; ok do border_thickness = bt
         if val, ok := new.transitions.?; ok {
             transitions = val
         }
@@ -516,6 +486,10 @@ layout_box_set_style:: proc(box: ^Layout_Box, new: ^Box_Style_Override, style: ^
 
 	if  !(.Border_Color in box.overrides) {
 		box.border_color = border_color
+	}
+
+    if  !(.Border_Thickness in box.overrides) {
+        box.border_thickness = border_thickness
 	}
 
 	if  !(.Border_Radius in box.overrides) {
@@ -564,6 +538,10 @@ layout_box_apply_style:: proc(box: ^Layout_Box, new: Box_Style_Override, use_tra
     
     if br, ok := new.border_radius.?; ok && !(.Border_Radius in box.overrides) {
         box.border_radius = br
+    }
+
+    if bt, ok := new.border_thickness.?; ok && !(.Border_Thickness in box.overrides) {
+        box.border_thickness = bt
     }
 
     if bc, ok := new.border_color.?; ok && !(.Border_Color in box.overrides) {

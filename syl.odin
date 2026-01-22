@@ -6,7 +6,6 @@ import "core:mem"
 ctx: ^Context
 
 @(private="package")
-
 Context :: struct {
 	allocator: mem.Allocator,
 	mouse_pos: [2]f32,
