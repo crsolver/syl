@@ -3,7 +3,6 @@ package raylib_renderer
 import rl "vendor:raylib"
 import syl "../.."
 import "core:strings"
-import "core:fmt"
 
 mouse_buttons_map := [syl.Mouse]rl.MouseButton{
 	.LEFT    = .LEFT,
@@ -37,7 +36,7 @@ deinit :: proc() {
 init_layout_box_shader :: proc() {
     // Load shaders from renderer/raylib relative to the process working directory
     // Use the alternative fragment shader `alt.fs` (converted for Raylib).
-    shader := rl.LoadShader("vertex.vs", "box_sdf.fs")
+    shader := rl.LoadShader("assets/vertex.vs", "assets/box_sdf.fs")
     box_shader = Box_Shader{
         shader = shader,
         loc_position      = rl.GetShaderLocation(shader, "position"),
